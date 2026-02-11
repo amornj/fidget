@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fidget!</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="menu">
+      <h1>🎮 Fidget!</h1>
+      <div id="game-grid">
+        <button class="game-card" data-game="snake">
+          <span class="game-icon">🐍</span>
+          <span class="game-name">Snake</span>
+        </button>
+        <button class="game-card" data-game="slime">
+          <span class="game-icon">🏐</span>
+          <span class="game-name">Slime Volley</span>
+        </button>
+        <button class="game-card" data-game="golf">
+          <span class="game-icon">⛳</span>
+          <span class="game-name">Mini Golf</span>
+        </button>
+        <button class="game-card" data-game="baseball">
+          <span class="game-icon">⚾</span>
+          <span class="game-name">Baseball</span>
+        </button>
+        <button class="game-card" data-game="clicker">
+          <span class="game-icon">👆</span>
+          <span class="game-name">Clicker</span>
+        </button>
+      </div>
+    </div>
+    <div id="game-container" style="display:none;">
+      <div id="game-header">
+        <button id="back-btn">← Back</button>
+        <span id="game-title"></span>
+        <span id="game-score"></span>
+      </div>
+      <canvas id="game-canvas" width="400" height="460"></canvas>
+      <div id="game-instructions"></div>
+    </div>
+  </div>
+  <script src="js/games/snake.js"></script>
+  <script src="js/games/slime.js"></script>
+  <script src="js/games/golf.js"></script>
+  <script src="js/games/baseball.js"></script>
+  <script src="js/games/clicker.js"></script>
+  <script src="js/popup.js"></script>
+</body>
+</html>
