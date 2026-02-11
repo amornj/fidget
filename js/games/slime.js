@@ -87,15 +87,43 @@ const SlimeGame = {
     if (p.y > this.groundY) { p.y = this.groundY; p.vy = 0; }
     p.x = Math.max(p.r, Math.min(this.netX - this.netW / 2 - p.r, p.x));
 
-    // AI movement
-    const targetX = b.x > this.netX ? b.x + b.vx * 10 : this.canvas.width - 100;
-    if (a.x < targetX - 10) a.x += a.speed * dt;
-    else if (a.x > targetX + 10) a.x -= a.speed * dt;
+    // AI movement — predict where ball will land
+    let targetX = this.canvas.width - 100; // default idle position
+    if (b.x > this.netX - 30) {
+      // Predict landing position using simple physics
+      let simX = b.x, simY = b.y, simVx = b.vx, simVy = b.vy;
+      for (let i = 0; i < 60; i++) {
+        simVy += this.gravity;
+        simX += simVx;
+        simY += simVy;
+        if (simY >= this.groundY) break;
+      }
+      targetX = Math.max(this.netX + this.netW / 2 + a.r, Math.min(this.canvas.width - a.r, simX));
+    } else if (b.vx > 0 && b.x > this.netX * 0.4) {
+      // Ball heading toward AI side — start positioning early
+      targetX = this.canvas.width * 0.65;
+    }
 
-    const ballApproaching = b.x > this.netX && b.y < this.groundY - 80;
-    const ballClose = Math.abs(b.x - a.x) < 60;
-    if (ballClose && b.y < a.y - 20 && a.y >= this.groundY) {
-      a.vy = -8;
+    const aiAccel = 4.5;
+    if (a.x < targetX - 5) a.x += aiAccel * dt;
+    else if (a.x > targetX + 5) a.x -= aiAccel * dt;
+
+    // Smart jumping — jump to intercept when ball is above and close
+    const ballDx = Math.abs(b.x - a.x);
+    const ballAbove = b.y < a.y - 10;
+    const ballOnAiSide = b.x > this.netX;
+    const ballDescending = b.vy > 0;
+    const ballNearGround = b.y > this.groundY - 150;
+
+    if (a.y >= this.groundY && ballOnAiSide) {
+      if (ballDx < 80 && ballAbove && ballNearGround) {
+        a.vy = -9;
+      } else if (ballDx < 40 && ballAbove) {
+        a.vy = -8.5;
+      } else if (b.y < this.groundY - 200 && ballDx < 30) {
+        // Ball high above — big jump to spike it
+        a.vy = -10;
+      }
     }
 
     a.vy += this.gravity * dt;

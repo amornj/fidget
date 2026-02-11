@@ -151,8 +151,8 @@ const GolfGame = {
     if (!this.dragging) return;
     this.dragging = false;
     const end = this.getCanvasPos(e);
-    let dx = this.dragStart.x - end.x;
-    let dy = this.dragStart.y - end.y;
+    let dx = end.x - this.dragStart.x;
+    let dy = end.y - this.dragStart.y;
     const power = Math.min(Math.sqrt(dx * dx + dy * dy), 150);
     const angle = Math.atan2(dy, dx);
     this.ball.vx = Math.cos(angle) * power * 0.08;
@@ -315,8 +315,8 @@ const GolfGame = {
 
     // Drag indicator
     if (this.dragging && this.dragEnd) {
-      const dx = this.dragStart.x - this.dragEnd.x;
-      const dy = this.dragStart.y - this.dragEnd.y;
+      const dx = this.dragEnd.x - this.dragStart.x;
+      const dy = this.dragEnd.y - this.dragStart.y;
       const power = Math.min(Math.sqrt(dx * dx + dy * dy), 150);
       const angle = Math.atan2(dy, dx);
 

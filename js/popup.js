@@ -4,6 +4,10 @@ const games = {
   golf: GolfGame,
   baseball: BaseballGame,
   clicker: ClickerGame,
+  breakout: BreakoutGame,
+  flappy: FlappyGame,
+  pong: PongGame,
+  reaction: ReactionGame,
 };
 
 let currentGame = null;
