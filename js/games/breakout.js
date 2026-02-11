@@ -69,7 +69,7 @@ const BreakoutGame = {
           color: colors[r % colors.length],
           points: (this.brickRows - r) * 10,
         });
-      });
+      }
     }
   },
 
