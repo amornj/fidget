@@ -328,8 +328,26 @@ const GolfGame = {
       this.lastDryPos = { x: b.x, y: b.y };
     }
 
-    b.x += b.vx;
-    b.y += b.vy;
+    // Sub-step movement to prevent skipping over the hole
+    var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    var subSteps = speed > 4 ? Math.ceil(speed / 3) : 1;
+    var svx = b.vx / subSteps;
+    var svy = b.vy / subSteps;
+    for (var ss = 0; ss < subSteps; ss++) {
+      b.x += svx;
+      b.y += svy;
+      // Pull toward hole when close
+      var pullDx = this.hole.x - b.x;
+      var pullDy = this.hole.y - b.y;
+      var pullDist = Math.sqrt(pullDx * pullDx + pullDy * pullDy);
+      if (pullDist < this.hole.r * 3 && pullDist > 0) {
+        var pullStr = 0.15 * (1 - pullDist / (this.hole.r * 3));
+        b.vx += (pullDx / pullDist) * pullStr;
+        b.vy += (pullDy / pullDist) * pullStr;
+        svx = b.vx / subSteps;
+        svy = b.vy / subSteps;
+      }
+    }
 
     // Water check
     if (this.isInWater(b.x, b.y)) {
@@ -408,9 +426,9 @@ const GolfGame = {
     const hdx = b.x - this.hole.x;
     const hdy = b.y - this.hole.y;
     const hdist = Math.sqrt(hdx * hdx + hdy * hdy);
-    const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    const holeSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
 
-    if (hdist < this.hole.r - 2 && speed < 8) {
+    if (hdist < this.hole.r - 2 && holeSpeed < 8) {
       this.sunk = true;
       this.sunkTimer = 60;
       b.vx = 0;

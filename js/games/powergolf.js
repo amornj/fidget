@@ -455,6 +455,16 @@ const PowerGolfGame = {
         var rad = deg * Math.PI / 180;
         var speed = 6;
         var path = this.simulatePath(this.ball.x, this.ball.y, Math.cos(rad) * speed, Math.sin(rad) * speed, 80);
+        // Compute min distance to hole for glow brightness
+        var minHoleDist = 99999;
+        for (var pi = 0; pi < path.length; pi++) {
+          var pdx = path[pi].x - this.hole.x;
+          var pdy = path[pi].y - this.hole.y;
+          var pd = Math.sqrt(pdx * pdx + pdy * pdy);
+          if (pd < minHoleDist) minHoleDist = pd;
+        }
+        path.minHoleDist = minHoleDist;
+        path.angle = rad;
         this.foresightPaths.push(path);
       }
       this.foresightTimer = 180;
@@ -630,9 +640,36 @@ const PowerGolfGame = {
     }
   },
 
+  foresightSnappedIdx: -1,
+
   mouseMove(e) {
     if (this.dragging) {
       this.dragEnd = this.getCanvasPos(e);
+      // Snap to nearest foresight path if available
+      this.foresightSnappedIdx = -1;
+      if (this.foresightPaths && this.foresightTimer > 0) {
+        var dx = this.dragEnd.x - this.dragStart.x;
+        var dy = this.dragEnd.y - this.dragStart.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 10) {
+          var dragAngle = Math.atan2(dy, dx);
+          var bestDist = 99999;
+          var bestIdx = -1;
+          for (var si = 0; si < this.foresightPaths.length; si++) {
+            var fp = this.foresightPaths[si];
+            var angleDiff = Math.abs(dragAngle - fp.angle);
+            // Normalize to [-PI, PI]
+            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+            if (angleDiff < bestDist) {
+              bestDist = angleDiff;
+              bestIdx = si;
+            }
+          }
+          // Snap if within ~5 degrees
+          if (bestDist < 0.09 && bestIdx >= 0) {
+            this.foresightSnappedIdx = bestIdx;
+          }
+        }
+      }
     }
   },
 
@@ -644,6 +681,12 @@ const PowerGolfGame = {
     var dy = end.y - this.dragStart.y;
     var power = Math.min(Math.sqrt(dx * dx + dy * dy), 150);
     var angle = Math.atan2(dy, dx);
+
+    // Snap to foresight path if one is highlighted
+    if (this.foresightSnappedIdx >= 0 && this.foresightPaths && this.foresightTimer > 0) {
+      angle = this.foresightPaths[this.foresightSnappedIdx].angle;
+      this.foresightSnappedIdx = -1;
+    }
 
     // Apply abilities on shot
     var usedAbility = null;
@@ -866,8 +909,44 @@ const PowerGolfGame = {
       }
     }
 
-    b.x += b.vx;
-    b.y += b.vy;
+    // Sub-step movement to prevent skipping over the hole
+    var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    var subSteps = speed > 4 ? Math.ceil(speed / 3) : 1;
+    var svx = b.vx / subSteps;
+    var svy = b.vy / subSteps;
+    for (var ss = 0; ss < subSteps; ss++) {
+      b.x += svx;
+      b.y += svy;
+      // Check hole proximity during each substep — pull toward hole when close
+      var pullDx = this.hole.x - b.x;
+      var pullDy = this.hole.y - b.y;
+      var pullDist = Math.sqrt(pullDx * pullDx + pullDy * pullDy);
+      var holeR = this.hole.r;
+      if (pullDist < holeR * 3 && pullDist > 0) {
+        var pullStrength = 0.15 * (1 - pullDist / (holeR * 3));
+        b.vx += (pullDx / pullDist) * pullStrength;
+        b.vy += (pullDy / pullDist) * pullStrength;
+        svx = b.vx / subSteps;
+        svy = b.vy / subSteps;
+      }
+      // Early hole check during substeps
+      if (pullDist < holeR - 2) {
+        var subSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+        if (subSpeed < 10) {
+          this.sinkBall();
+          return;
+        }
+      }
+    }
+    // Also check extra holes during substeps
+    for (var ehi2 = 0; ehi2 < this.extraHoles.length; ehi2++) {
+      var eh2 = this.extraHoles[ehi2];
+      var ehd = Math.sqrt((b.x - eh2.x) * (b.x - eh2.x) + (b.y - eh2.y) * (b.y - eh2.y));
+      if (ehd < eh2.r - 1 && Math.sqrt(b.vx * b.vx + b.vy * b.vy) < 10) {
+        this.sinkBall();
+        return;
+      }
+    }
 
     // Water hazards
     var currentlyInWater = false;
@@ -1214,21 +1293,39 @@ const PowerGolfGame = {
     ctx.lineTo(this.hole.x + 1.5, this.hole.y - 21);
     ctx.fill();
 
-    // Foresight paths
+    // Foresight paths — glow brighter near hole, highlight snapped path
     if (this.foresightPaths && this.foresightTimer > 0) {
-      var fAlpha = (this.foresightTimer / 180) * 0.08;
+      var fadeBase = this.foresightTimer / 180;
+      var snappedIdx = this.foresightSnappedIdx;
       for (var fi = 0; fi < this.foresightPaths.length; fi++) {
         var fp = this.foresightPaths[fi];
         if (fp.length < 2) continue;
         var hue = (fi / this.foresightPaths.length) * 360;
-        ctx.strokeStyle = 'hsla(' + hue + ', 80%, 60%, ' + fAlpha + ')';
-        ctx.lineWidth = 1;
+        // Brightness scales inversely with distance to hole (closer = brighter)
+        var closeness = Math.max(0, 1 - (fp.minHoleDist || 999) / 300);
+        var baseAlpha = 0.03 + closeness * 0.35;
+        var lw = 0.8 + closeness * 2.5;
+        // If this is the snapped path, draw it extra bright
+        if (fi === snappedIdx) {
+          baseAlpha = 0.8;
+          lw = 3;
+        }
+        var fAlpha = fadeBase * baseAlpha;
+        ctx.strokeStyle = 'hsla(' + hue + ', 80%, ' + (50 + closeness * 30) + '%, ' + fAlpha + ')';
+        ctx.lineWidth = lw;
         ctx.beginPath();
         ctx.moveTo(fp[0].x, fp[0].y);
         for (var fpi = 1; fpi < fp.length; fpi++) {
           ctx.lineTo(fp[fpi].x, fp[fpi].y);
         }
         ctx.stroke();
+        // Draw glow endpoint for close paths
+        if (closeness > 0.5 && fp.length > 0) {
+          ctx.fillStyle = 'hsla(' + hue + ', 80%, 70%, ' + (fadeBase * closeness * 0.5) + ')';
+          ctx.beginPath();
+          ctx.arc(fp[fp.length - 1].x, fp[fp.length - 1].y, 3 + closeness * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
