@@ -329,8 +329,8 @@ const BaseballGame = {
       s.vx += wobbleForce * 0.02;
 
       // Player input
-      if (this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) s.vx -= 0.025;
-      if (this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) s.vx += 0.025;
+      if (this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) s.vx -= 0.012;
+      if (this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) s.vx += 0.012;
 
       // Friction
       s.vx *= 0.88;

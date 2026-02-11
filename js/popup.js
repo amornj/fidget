@@ -8,6 +8,7 @@ const games = {
   flappy: FlappyGame,
   pong: PongGame,
   reaction: ReactionGame,
+  powergolf: PowerGolfGame,
 };
 
 let currentGame = null;
