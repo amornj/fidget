@@ -9,6 +9,7 @@ const games = {
   pong: PongGame,
   reaction: ReactionGame,
   powergolf: PowerGolfGame,
+  barista: BaristaGame,
 };
 
 let currentGame = null;

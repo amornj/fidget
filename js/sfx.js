@@ -61,4 +61,5 @@ const SFX = {
   click()    { this.tone(800, 0.03, 'square', 0.06); },
   error()    { this.tone(200, 0.15, 'square', 0.1, 100); },
   swing()    { this.tone(150, 0.1, 'sawtooth', 0.06, 300); },
+  pour()     { this.noise(0.05, 0.04); this.tone(900, 0.06, 'sine', 0.03, 1200); },
 };

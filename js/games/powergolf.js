@@ -52,6 +52,18 @@ const PowerGolfGame = {
   lastDryPos: null,
   inWater: false,
 
+  // Ability animations
+  clubAnim: null,
+  superShotActive: false,
+  fireParticles: [],
+  wrenchAnim: null,
+  shovelAnim: null,
+  shovelDigParticles: [],
+  revolverGunAnim: null,
+  atomizerGunPos: null,
+  wallDissolve: [],
+  foresightEyeAnim: null,
+
   // All 13 powerup types
   powerupTypes: [
     { id: 'supershot', name: 'Super Shot', icon: '\u{1F4A5}', color: '#ff6b6b', desc: '2x power on next shot' },
@@ -256,6 +268,171 @@ const PowerGolfGame = {
         { x: 350, y: 350 },
       ],
     },
+    // Level 11 - The Funnel
+    {
+      ball: { x: 60, y: 60 },
+      hole: { x: 350, y: 400 },
+      walls: [
+        { x: 30, y: 30, w: 360, h: 10 },
+        { x: 30, y: 430, w: 360, h: 10 },
+        { x: 30, y: 30, w: 10, h: 410 },
+        { x: 380, y: 30, w: 10, h: 410 },
+        // Diagonal corridor walls narrowing to bottleneck
+        { x: 80, y: 100, w: 120, h: 10 },
+        { x: 220, y: 80, w: 10, h: 80 },
+        { x: 140, y: 200, w: 10, h: 100, moveX: 1, moveRange: 35, moveSpeed: 0.02 },
+        { x: 260, y: 180, w: 10, h: 120, moveX: 1, moveRange: 30, moveSpeed: 0.025 },
+        { x: 180, y: 340, w: 10, h: 60, moveY: 1, moveRange: 20, moveSpeed: 0.03 },
+        { x: 240, y: 320, w: 10, h: 80 },
+      ],
+      water: [
+        { x: 40, y: 120, w: 80, h: 50 },
+      ],
+      rocks: [
+        { x: 170, y: 150, r: 14 },
+        { x: 300, y: 250, r: 16 },
+        { x: 210, y: 380, r: 12 },
+      ],
+      pickups: [{ x: 120, y: 60 }, { x: 300, y: 120 }, { x: 200, y: 270 }, { x: 330, y: 360 }],
+    },
+    // Level 12 - Pinball Alley
+    {
+      ball: { x: 200, y: 410 },
+      hole: { x: 200, y: 60 },
+      walls: [
+        { x: 30, y: 30, w: 360, h: 10 },
+        { x: 30, y: 430, w: 360, h: 10 },
+        { x: 30, y: 30, w: 10, h: 410 },
+        { x: 380, y: 30, w: 10, h: 410 },
+        // Flipper walls
+        { x: 80, y: 360, w: 60, h: 10, moveX: 1, moveRange: 25, moveSpeed: 0.035 },
+        { x: 270, y: 360, w: 60, h: 10, moveX: 1, moveRange: 25, moveSpeed: 0.035 },
+        { x: 160, y: 180, w: 80, h: 10, moveY: 1, moveRange: 20, moveSpeed: 0.02 },
+      ],
+      water: [
+        { x: 40, y: 150, w: 30, h: 200 },
+        { x: 345, y: 150, w: 30, h: 200 },
+      ],
+      rocks: [
+        { x: 120, y: 120, r: 14 },
+        { x: 280, y: 120, r: 14 },
+        { x: 200, y: 160, r: 16 },
+        { x: 140, y: 240, r: 12 },
+        { x: 260, y: 240, r: 12 },
+        { x: 200, y: 300, r: 15 },
+        { x: 100, y: 300, r: 13 },
+        { x: 300, y: 300, r: 13 },
+      ],
+      pickups: [{ x: 80, y: 80 }, { x: 320, y: 80 }, { x: 200, y: 220 }, { x: 120, y: 380 }, { x: 280, y: 380 }],
+    },
+    // Level 13 - The Maze Runner
+    {
+      ball: { x: 60, y: 410 },
+      hole: { x: 350, y: 60 },
+      walls: [
+        { x: 30, y: 30, w: 360, h: 10 },
+        { x: 30, y: 430, w: 360, h: 10 },
+        { x: 30, y: 30, w: 10, h: 410 },
+        { x: 380, y: 30, w: 10, h: 410 },
+        // Dense shifting maze
+        { x: 100, y: 30, w: 10, h: 120, moveY: 1, moveRange: 30, moveSpeed: 0.02 },
+        { x: 180, y: 100, w: 10, h: 100, moveY: 1, moveRange: 25, moveSpeed: 0.028 },
+        { x: 100, y: 200, w: 120, h: 10, moveX: 1, moveRange: 40, moveSpeed: 0.018 },
+        { x: 260, y: 80, w: 10, h: 130, moveY: 1, moveRange: 35, moveSpeed: 0.022 },
+        { x: 160, y: 280, w: 10, h: 100, moveY: 1, moveRange: 20, moveSpeed: 0.03 },
+        { x: 300, y: 250, w: 10, h: 80, moveY: 1, moveRange: 30, moveSpeed: 0.025 },
+        { x: 220, y: 330, w: 10, h: 100 },
+        { x: 80, y: 340, w: 80, h: 10, moveX: 1, moveRange: 25, moveSpeed: 0.02 },
+        { x: 300, y: 370, w: 80, h: 10 },
+      ],
+      water: [
+        { x: 110, y: 150, w: 60, h: 40 },
+        { x: 270, y: 340, w: 50, h: 40 },
+        { x: 50, y: 270, w: 40, h: 50 },
+      ],
+      pickups: [{ x: 60, y: 120 }, { x: 230, y: 60 }, { x: 140, y: 250 }, { x: 340, y: 200 }, { x: 300, y: 410 }],
+    },
+    // Level 14 - Whirlpool
+    {
+      ball: { x: 60, y: 400 },
+      hole: { x: 200, y: 230 },
+      walls: [
+        { x: 30, y: 30, w: 360, h: 10 },
+        { x: 30, y: 430, w: 360, h: 10 },
+        { x: 30, y: 30, w: 10, h: 410 },
+        { x: 380, y: 30, w: 10, h: 410 },
+        // Circular perimeter of moving walls
+        { x: 100, y: 80, w: 10, h: 80, moveY: 1, moveRange: 30, moveSpeed: 0.025 },
+        { x: 300, y: 80, w: 10, h: 80, moveY: 1, moveRange: 30, moveSpeed: 0.025 },
+        { x: 140, y: 60, w: 120, h: 10, moveX: 1, moveRange: 20, moveSpeed: 0.02 },
+        { x: 100, y: 320, w: 10, h: 80, moveY: 1, moveRange: 25, moveSpeed: 0.03 },
+        { x: 300, y: 320, w: 10, h: 80, moveY: 1, moveRange: 25, moveSpeed: 0.03 },
+        { x: 140, y: 390, w: 120, h: 10, moveX: 1, moveRange: 20, moveSpeed: 0.02 },
+        { x: 60, y: 180, w: 10, h: 100, moveY: 1, moveRange: 35, moveSpeed: 0.018 },
+        { x: 340, y: 180, w: 10, h: 100, moveY: 1, moveRange: 35, moveSpeed: 0.018 },
+      ],
+      water: [
+        // Central water ring around hole
+        { x: 150, y: 180, w: 100, h: 20 },
+        { x: 150, y: 260, w: 100, h: 20 },
+        { x: 145, y: 200, w: 20, h: 60 },
+        { x: 240, y: 200, w: 20, h: 60 },
+      ],
+      rocks: [
+        { x: 130, y: 140, r: 14 },
+        { x: 270, y: 140, r: 14 },
+        { x: 130, y: 320, r: 14 },
+        { x: 270, y: 320, r: 14 },
+      ],
+      pickups: [{ x: 60, y: 80 }, { x: 350, y: 80 }, { x: 200, y: 140 }, { x: 60, y: 300 }, { x: 350, y: 400 }],
+    },
+    // Level 15 - Nightmare
+    {
+      ball: { x: 60, y: 410 },
+      hole: { x: 350, y: 60 },
+      walls: [
+        { x: 30, y: 30, w: 360, h: 10 },
+        { x: 30, y: 430, w: 360, h: 10 },
+        { x: 30, y: 30, w: 10, h: 410 },
+        { x: 380, y: 30, w: 10, h: 410 },
+        // Dense moving wall maze
+        { x: 90, y: 60, w: 10, h: 100, moveY: 1, moveRange: 40, moveSpeed: 0.03 },
+        { x: 170, y: 40, w: 10, h: 80, moveY: 1, moveRange: 30, moveSpeed: 0.025 },
+        { x: 250, y: 60, w: 10, h: 120, moveY: 1, moveRange: 35, moveSpeed: 0.028 },
+        { x: 330, y: 100, w: 10, h: 60, moveY: 1, moveRange: 25, moveSpeed: 0.035 },
+        { x: 120, y: 200, w: 80, h: 10, moveX: 1, moveRange: 40, moveSpeed: 0.022 },
+        { x: 230, y: 220, w: 10, h: 100, moveY: 1, moveRange: 30, moveSpeed: 0.03 },
+        { x: 300, y: 250, w: 10, h: 80, moveY: 1, moveRange: 35, moveSpeed: 0.02 },
+        { x: 80, y: 300, w: 10, h: 90, moveY: 1, moveRange: 30, moveSpeed: 0.028 },
+        { x: 160, y: 330, w: 80, h: 10, moveX: 1, moveRange: 30, moveSpeed: 0.025 },
+        { x: 280, y: 370, w: 10, h: 60, moveY: 1, moveRange: 20, moveSpeed: 0.035 },
+        { x: 60, y: 160, w: 60, h: 10, moveX: 1, moveRange: 25, moveSpeed: 0.02 },
+        { x: 340, y: 340, w: 40, h: 10, moveX: 1, moveRange: 15, moveSpeed: 0.04 },
+      ],
+      water: [
+        { x: 100, y: 120, w: 60, h: 40 },
+        { x: 260, y: 160, w: 50, h: 40 },
+        { x: 50, y: 350, w: 60, h: 40 },
+        { x: 310, y: 300, w: 60, h: 35 },
+      ],
+      rocks: [
+        { x: 140, y: 100, r: 12 },
+        { x: 210, y: 160, r: 14 },
+        { x: 310, y: 180, r: 12 },
+        { x: 120, y: 270, r: 15 },
+        { x: 270, y: 290, r: 13 },
+        { x: 180, y: 380, r: 14 },
+        { x: 350, y: 400, r: 11 },
+      ],
+      pickups: [
+        { x: 60, y: 100 },
+        { x: 200, y: 100 },
+        { x: 340, y: 150 },
+        { x: 150, y: 250 },
+        { x: 340, y: 280 },
+        { x: 200, y: 400 },
+      ],
+    },
   ],
 
   init(canvas) {
@@ -282,6 +459,16 @@ const PowerGolfGame = {
     this.lastDryPos = null;
     this.inWater = false;
     this.frameCount = 0;
+    this.clubAnim = null;
+    this.superShotActive = false;
+    this.fireParticles = [];
+    this.wrenchAnim = null;
+    this.shovelAnim = null;
+    this.shovelDigParticles = [];
+    this.revolverGunAnim = null;
+    this.atomizerGunPos = null;
+    this.wallDissolve = [];
+    this.foresightEyeAnim = null;
     this.loadLevel();
 
     this._onMouseDown = (e) => this.mouseDown(e);
@@ -343,6 +530,16 @@ const PowerGolfGame = {
     this.foresightPaths = null;
     this.foresightTimer = 0;
     this.invertTimer = 0;
+    this.clubAnim = null;
+    this.superShotActive = false;
+    this.fireParticles = [];
+    this.wrenchAnim = null;
+    this.shovelAnim = null;
+    this.shovelDigParticles = [];
+    this.revolverGunAnim = null;
+    this.atomizerGunPos = null;
+    this.wallDissolve = [];
+    this.foresightEyeAnim = null;
 
     // Spawn pickups with random types
     this.pickups = (lvl.pickups || []).map(function(p) {
@@ -422,6 +619,17 @@ const PowerGolfGame = {
       ny = Math.max(50, Math.min(420, ny));
       this.extraHoles.push({ x: nx, y: ny, r: 10 });
       this.spawnParticles(nx, ny, '#8b6914', 12);
+      this.shovelAnim = { timer: 30, x: nx, y: ny };
+      // Spawn dirt particles biased upward
+      for (var di = 0; di < 15; di++) {
+        this.shovelDigParticles.push({
+          x: nx, y: ny,
+          vx: (Math.random() - 0.5) * 4,
+          vy: -Math.random() * 5 - 1,
+          life: 20 + Math.random() * 10,
+          color: ['#8b6914', '#a0822a', '#6b4f10'][Math.floor(Math.random() * 3)],
+        });
+      }
       this.abilities.splice(index, 1);
       this.message = 'Extra hole dug!';
       this.messageTimer = 40;
@@ -432,6 +640,7 @@ const PowerGolfGame = {
       this.clampTimer = 480;
       this.hole.r = this.clampOrigR * 2.5;
       this.spawnParticles(this.hole.x, this.hole.y, '#00cec9', 15);
+      this.wrenchAnim = { timer: 40, x: this.hole.x, y: this.hole.y, rotation: 0 };
       this.abilities.splice(index, 1);
       this.message = 'Hole enlarged!';
       this.messageTimer = 40;
@@ -478,6 +687,7 @@ const PowerGolfGame = {
       }
       this.foresightTimer = 480; // 8 seconds total (best path uses full duration)
       this.spawnParticles(this.ball.x, this.ball.y, '#e056fd', 20);
+      this.foresightEyeAnim = { timer: 30, x: this.ball.x, y: this.ball.y, scale: 0 };
       this.abilities.splice(index, 1);
       this.message = 'Foresight!';
       this.messageTimer = 40;
@@ -594,15 +804,29 @@ const PowerGolfGame = {
     if (this.atomizerMode) {
       for (var i = 0; i < this.walls.length; i++) {
         var w = this.walls[i];
-        if (w.destroyed) continue;
-        // Check if first 4 boundary walls - skip them
+        if (w.destroyed || w.dissolving) continue;
         if (pos.x >= w.x && pos.x <= w.x + w.w && pos.y >= w.y && pos.y <= w.y + w.h) {
-          w.destroyed = true;
-          this.spawnParticles((w.x + w.w / 2), (w.y + w.h / 2), '#fd79a8', 25);
+          // Start dissolve animation instead of instant destroy
+          w.dissolving = true;
+          this.wallDissolve.push({ wallIdx: i, timer: 30, maxTimer: 30 });
+          // Spawn dust particles
+          var wcx = w.x + w.w / 2;
+          var wcy = w.y + w.h / 2;
+          for (var dp = 0; dp < 20; dp++) {
+            this.particles.push({
+              x: wcx + (Math.random() - 0.5) * w.w,
+              y: wcy + (Math.random() - 0.5) * w.h,
+              vx: (Math.random() - 0.5) * 3,
+              vy: (Math.random() - 0.5) * 3,
+              color: ['#fd79a8', '#999', '#ddd'][Math.floor(Math.random() * 3)],
+              life: 20 + Math.random() * 10,
+            });
+          }
           if (typeof SFX !== 'undefined') SFX.explode();
-          this.message = 'Wall destroyed!';
+          this.message = 'Wall dissolving!';
           this.messageTimer = 40;
           this.atomizerMode = false;
+          this.atomizerGunPos = null;
           this.consumeActiveAbility();
           return;
         }
@@ -646,14 +870,19 @@ const PowerGolfGame = {
       this.dragging = true;
       this.dragStart = pos;
       this.dragEnd = pos;
+      this.clubAnim = { phase: 'windup', timer: 0, angle: 0 };
     }
   },
 
   foresightSnappedIdx: -1,
 
   mouseMove(e) {
+    var pos = this.getCanvasPos(e);
+    if (this.atomizerMode) {
+      this.atomizerGunPos = pos;
+    }
     if (this.dragging) {
-      this.dragEnd = this.getCanvasPos(e);
+      this.dragEnd = pos;
       // Snap to nearest foresight path if available
       this.foresightSnappedIdx = -1;
       if (this.foresightPaths && this.foresightTimer > 0) {
@@ -697,17 +926,24 @@ const PowerGolfGame = {
       this.foresightSnappedIdx = -1;
     }
 
+    // Club strike animation
+    this.clubAnim = { phase: 'strike', timer: 12, angle: angle };
+    if (typeof SFX !== 'undefined') SFX.swing();
+
     // Apply abilities on shot
     var usedAbility = null;
     if (this.activeAbility && this.activeAbility.id === 'supershot') {
       power *= 2;
       usedAbility = this.consumeActiveAbility();
       this.spawnParticles(this.ball.x, this.ball.y, '#ff6b6b', 20);
+      this.superShotActive = true;
       if (typeof SFX !== 'undefined') SFX.whoosh();
     } else if (this.activeAbility && this.activeAbility.id === 'revolver') {
       usedAbility = this.consumeActiveAbility();
       this.ball.revolver = true;
       this.revolverSavePos = { x: this.ball.x, y: this.ball.y };
+      this.revolverGunAnim = { timer: 20, x: this.ball.x, y: this.ball.y, angle: angle };
+      if (typeof SFX !== 'undefined') SFX.explode();
     } else if (this.activeAbility && ['ghost', 'multiball', 'magnet', 'curve'].indexOf(this.activeAbility.id) !== -1) {
       usedAbility = this.consumeActiveAbility();
     }
@@ -806,6 +1042,96 @@ const PowerGolfGame = {
       if (sh.life > 0) newShards.push(sh);
     }
     this.shards = newShards;
+
+    // Club animation update
+    if (this.clubAnim) {
+      if (this.clubAnim.phase === 'windup') {
+        this.clubAnim.timer++;
+      } else if (this.clubAnim.phase === 'strike') {
+        this.clubAnim.timer--;
+        if (this.clubAnim.timer <= 0) this.clubAnim = null;
+      }
+    }
+
+    // Super shot fire trail
+    if (this.superShotActive && this.ballMoving()) {
+      for (var fpi = 0; fpi < 3; fpi++) {
+        this.fireParticles.push({
+          x: this.ball.x + (Math.random() - 0.5) * 6,
+          y: this.ball.y + (Math.random() - 0.5) * 6,
+          vx: -this.ball.vx * 0.3 + (Math.random() - 0.5) * 2,
+          vy: -this.ball.vy * 0.3 + (Math.random() - 0.5) * 2,
+          life: 12 + Math.random() * 8,
+          color: ['#ff6b6b', '#ff9f43', '#feca57'][Math.floor(Math.random() * 3)],
+        });
+      }
+    }
+    if (!this.ballMoving() && this.superShotActive) {
+      this.superShotActive = false;
+    }
+    var newFire = [];
+    for (var ffi = 0; ffi < this.fireParticles.length; ffi++) {
+      var fp = this.fireParticles[ffi];
+      fp.x += fp.vx;
+      fp.y += fp.vy;
+      fp.vx *= 0.92;
+      fp.vy *= 0.92;
+      fp.life--;
+      if (fp.life > 0) newFire.push(fp);
+    }
+    this.fireParticles = newFire;
+
+    // Wrench animation
+    if (this.wrenchAnim) {
+      this.wrenchAnim.timer--;
+      this.wrenchAnim.rotation += 0.15;
+      if (this.wrenchAnim.timer <= 0) this.wrenchAnim = null;
+    }
+
+    // Shovel animation + dig particles
+    if (this.shovelAnim) {
+      this.shovelAnim.timer--;
+      if (this.shovelAnim.timer <= 0) this.shovelAnim = null;
+    }
+    var newDigP = [];
+    for (var dpi = 0; dpi < this.shovelDigParticles.length; dpi++) {
+      var dp = this.shovelDigParticles[dpi];
+      dp.x += dp.vx;
+      dp.y += dp.vy;
+      dp.vy += 0.2;
+      dp.life--;
+      if (dp.life > 0) newDigP.push(dp);
+    }
+    this.shovelDigParticles = newDigP;
+
+    // Revolver gun animation
+    if (this.revolverGunAnim) {
+      this.revolverGunAnim.timer--;
+      if (this.revolverGunAnim.timer <= 0) this.revolverGunAnim = null;
+    }
+
+    // Wall dissolve
+    var newDissolve = [];
+    for (var wdi = 0; wdi < this.wallDissolve.length; wdi++) {
+      var wd = this.wallDissolve[wdi];
+      wd.timer--;
+      if (wd.timer <= 0) {
+        this.walls[wd.wallIdx].destroyed = true;
+        this.walls[wd.wallIdx].dissolving = false;
+      } else {
+        newDissolve.push(wd);
+      }
+    }
+    this.wallDissolve = newDissolve;
+
+    // Foresight eye animation
+    if (this.foresightEyeAnim) {
+      this.foresightEyeAnim.timer--;
+      if (this.foresightEyeAnim.timer > 15) {
+        this.foresightEyeAnim.scale = (30 - this.foresightEyeAnim.timer) / 15 * 2.0;
+      }
+      if (this.foresightEyeAnim.timer <= 0) this.foresightEyeAnim = null;
+    }
 
     // Revolver fail sequence
     if (this.revolverFail) {
@@ -1228,6 +1554,23 @@ const PowerGolfGame = {
         ctx.setLineDash([]);
         continue;
       }
+      // Dissolving wall — fade out with decreasing opacity
+      if (w.dissolving) {
+        var dissolveInfo = null;
+        for (var dsi = 0; dsi < this.wallDissolve.length; dsi++) {
+          if (this.wallDissolve[dsi].wallIdx === wi) { dissolveInfo = this.wallDissolve[dsi]; break; }
+        }
+        if (dissolveInfo) {
+          var dissolveAlpha = dissolveInfo.timer / dissolveInfo.maxTimer;
+          ctx.save();
+          ctx.globalAlpha = dissolveAlpha;
+          ctx.fillStyle = '#fd79a8';
+          ctx.fillRect(w.x, w.y, w.w, w.h);
+          ctx.globalAlpha = 1;
+          ctx.restore();
+          continue;
+        }
+      }
       // Moving walls get a different color
       var isMoving = (w.moveX || w.moveY);
       ctx.fillStyle = isMoving ? '#4a2a10' : '#5a3a1a';
@@ -1322,13 +1665,21 @@ const PowerGolfGame = {
         }
 
         if (isBest) {
-          // Best path: bright white, thick line with glow
+          // Best path: bright white (or gold when snapped), thick line with glow
+          var bestSnapped = (fi === snappedIdx);
           var bestAlpha = fadeBase * 0.9;
           ctx.save();
-          ctx.shadowColor = 'rgba(255,255,255,0.6)';
-          ctx.shadowBlur = 8;
-          ctx.strokeStyle = 'rgba(255, 255, 255, ' + bestAlpha + ')';
-          ctx.lineWidth = 3.5;
+          if (bestSnapped) {
+            ctx.shadowColor = 'rgba(255,255,100,0.8)';
+            ctx.shadowBlur = 16;
+            ctx.strokeStyle = 'rgba(255, 255, 100, ' + bestAlpha + ')';
+            ctx.lineWidth = 5;
+          } else {
+            ctx.shadowColor = 'rgba(255,255,255,0.6)';
+            ctx.shadowBlur = 8;
+            ctx.strokeStyle = 'rgba(255, 255, 255, ' + bestAlpha + ')';
+            ctx.lineWidth = 3.5;
+          }
           ctx.beginPath();
           ctx.moveTo(fp[0].x, fp[0].y);
           for (var fpi = 1; fpi < fp.length; fpi++) {
@@ -1339,11 +1690,13 @@ const PowerGolfGame = {
           // Bright endpoint glow
           if (fp.length > 0) {
             ctx.save();
-            ctx.shadowColor = '#fff';
-            ctx.shadowBlur = 12;
-            ctx.fillStyle = 'rgba(255, 255, 255, ' + (fadeBase * 0.7) + ')';
+            ctx.shadowColor = bestSnapped ? '#ffff64' : '#fff';
+            ctx.shadowBlur = bestSnapped ? 16 : 12;
+            ctx.fillStyle = bestSnapped
+              ? 'rgba(255, 255, 100, ' + (fadeBase * 0.9) + ')'
+              : 'rgba(255, 255, 255, ' + (fadeBase * 0.7) + ')';
             ctx.beginPath();
-            ctx.arc(fp[fp.length - 1].x, fp[fp.length - 1].y, 5, 0, Math.PI * 2);
+            ctx.arc(fp[fp.length - 1].x, fp[fp.length - 1].y, bestSnapped ? 7 : 5, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
           }
@@ -1436,6 +1789,12 @@ const PowerGolfGame = {
         ctx.shadowBlur = 12;
       }
 
+      // Super shot pulsing glow
+      if (this.superShotActive) {
+        ctx.shadowColor = '#ff6b6b';
+        ctx.shadowBlur = 20 + Math.sin(this.frameCount * 0.3) * 8;
+      }
+
       ctx.fillStyle = '#fff';
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -1447,6 +1806,130 @@ const PowerGolfGame = {
       ctx.beginPath();
       ctx.arc(b.x - 2, b.y - 2, 3, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // Fire trail particles (super shot)
+    for (var ftri = 0; ftri < this.fireParticles.length; ftri++) {
+      var ftp = this.fireParticles[ftri];
+      ctx.globalAlpha = ftp.life / 20;
+      ctx.fillStyle = ftp.color;
+      ctx.beginPath();
+      ctx.arc(ftp.x, ftp.y, 2 + (ftp.life / 20) * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Club animation
+    if (this.clubAnim && !this.sunk) {
+      ctx.save();
+      ctx.translate(this.ball.x, this.ball.y);
+      var cAngle;
+      if (this.clubAnim.phase === 'windup' && this.dragging && this.dragEnd) {
+        cAngle = Math.atan2(this.dragEnd.y - this.dragStart.y, this.dragEnd.x - this.dragStart.x);
+        cAngle += Math.PI + Math.sin(this.clubAnim.timer * 0.15) * 0.2;
+        this.clubAnim.angle = cAngle;
+      } else {
+        cAngle = this.clubAnim.angle;
+      }
+      ctx.rotate(cAngle);
+      var clubAlpha = this.clubAnim.phase === 'strike' ? this.clubAnim.timer / 12 : 1;
+      ctx.globalAlpha = clubAlpha;
+      // Shaft
+      ctx.fillStyle = '#8B6914';
+      ctx.fillRect(10, -2, 35, 4);
+      // Head
+      ctx.fillStyle = '#ccc';
+      ctx.fillRect(45, -5, 10, 10);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Wrench animation (clamp)
+    if (this.wrenchAnim) {
+      ctx.save();
+      ctx.globalAlpha = this.wrenchAnim.timer / 40;
+      ctx.translate(this.wrenchAnim.x, this.wrenchAnim.y - 20 - Math.sin(this.wrenchAnim.rotation * 2) * 5);
+      ctx.rotate(Math.sin(this.wrenchAnim.rotation) * 0.4);
+      ctx.font = '22px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u{1F527}', 0, 0);
+      ctx.restore();
+    }
+
+    // Shovel animation
+    if (this.shovelAnim) {
+      ctx.save();
+      var shovelBounce = Math.sin((30 - this.shovelAnim.timer) * 0.3) * 8;
+      ctx.globalAlpha = this.shovelAnim.timer / 30;
+      ctx.font = '20px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u{26CF}\u{FE0F}', this.shovelAnim.x, this.shovelAnim.y - 15 - shovelBounce);
+      ctx.restore();
+    }
+    // Shovel dig particles
+    for (var sdpi = 0; sdpi < this.shovelDigParticles.length; sdpi++) {
+      var sdp = this.shovelDigParticles[sdpi];
+      ctx.globalAlpha = sdp.life / 30;
+      ctx.fillStyle = sdp.color;
+      ctx.beginPath();
+      ctx.arc(sdp.x, sdp.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Revolver gun animation
+    if (this.revolverGunAnim) {
+      ctx.save();
+      ctx.translate(this.revolverGunAnim.x, this.revolverGunAnim.y);
+      ctx.rotate(this.revolverGunAnim.angle);
+      ctx.globalAlpha = this.revolverGunAnim.timer / 20;
+      // Gun barrel
+      ctx.fillStyle = '#636e72';
+      ctx.fillRect(8, -3, 25, 6);
+      ctx.fillRect(0, -5, 12, 10);
+      // Muzzle flash (first 5 frames)
+      if (this.revolverGunAnim.timer > 15) {
+        ctx.fillStyle = '#feca57';
+        ctx.beginPath();
+        ctx.arc(35, 0, 8 + Math.random() * 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(35, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Atomizer cursor (dashed line + icon)
+    if (this.atomizerMode && this.atomizerGunPos) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(253,121,168,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(this.ball.x, this.ball.y);
+      ctx.lineTo(this.atomizerGunPos.x, this.atomizerGunPos.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = '18px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u{269B}\u{FE0F}', this.atomizerGunPos.x, this.atomizerGunPos.y + 6);
+      ctx.restore();
+    }
+
+    // Foresight eye animation
+    if (this.foresightEyeAnim) {
+      ctx.save();
+      var eyeScale = this.foresightEyeAnim.scale || 0;
+      ctx.globalAlpha = this.foresightEyeAnim.timer / 30;
+      ctx.translate(this.foresightEyeAnim.x, this.foresightEyeAnim.y - 25);
+      ctx.scale(eyeScale, eyeScale);
+      ctx.font = '24px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u{1F52E}', 0, 0);
+      ctx.restore();
     }
 
     // Phantom path preview (while dragging)
