@@ -467,7 +467,16 @@ const PowerGolfGame = {
         path.angle = rad;
         this.foresightPaths.push(path);
       }
-      this.foresightTimer = 180;
+      // Find the best path (closest to hole)
+      this.foresightBestIdx = 0;
+      var bestDist = 99999;
+      for (var bi = 0; bi < this.foresightPaths.length; bi++) {
+        if (this.foresightPaths[bi].minHoleDist < bestDist) {
+          bestDist = this.foresightPaths[bi].minHoleDist;
+          this.foresightBestIdx = bi;
+        }
+      }
+      this.foresightTimer = 480; // 8 seconds total (best path uses full duration)
       this.spawnParticles(this.ball.x, this.ball.y, '#e056fd', 20);
       this.abilities.splice(index, 1);
       this.message = 'Foresight!';
@@ -1294,37 +1303,76 @@ const PowerGolfGame = {
     ctx.fill();
 
     // Foresight paths — glow brighter near hole, highlight snapped path
+    // Best path persists 8 sec (bright white), others decay in 3 sec
     if (this.foresightPaths && this.foresightTimer > 0) {
-      var fadeBase = this.foresightTimer / 180;
       var snappedIdx = this.foresightSnappedIdx;
+      var bestIdx = this.foresightBestIdx || 0;
       for (var fi = 0; fi < this.foresightPaths.length; fi++) {
         var fp = this.foresightPaths[fi];
         if (fp.length < 2) continue;
-        var hue = (fi / this.foresightPaths.length) * 360;
-        // Brightness scales inversely with distance to hole (closer = brighter)
-        var closeness = Math.max(0, 1 - (fp.minHoleDist || 999) / 300);
-        var baseAlpha = 0.03 + closeness * 0.35;
-        var lw = 0.8 + closeness * 2.5;
-        // If this is the snapped path, draw it extra bright
-        if (fi === snappedIdx) {
-          baseAlpha = 0.8;
-          lw = 3;
+        var isBest = (fi === bestIdx);
+        // Best path fades over full 480 frames (8s), others fade in first 3s (timer 480→300)
+        var fadeBase;
+        if (isBest) {
+          fadeBase = this.foresightTimer / 480;
+        } else {
+          fadeBase = (this.foresightTimer - 300) / 180;
+          if (fadeBase <= 0) continue;
+          fadeBase = Math.min(1, fadeBase);
         }
-        var fAlpha = fadeBase * baseAlpha;
-        ctx.strokeStyle = 'hsla(' + hue + ', 80%, ' + (50 + closeness * 30) + '%, ' + fAlpha + ')';
-        ctx.lineWidth = lw;
-        ctx.beginPath();
-        ctx.moveTo(fp[0].x, fp[0].y);
-        for (var fpi = 1; fpi < fp.length; fpi++) {
-          ctx.lineTo(fp[fpi].x, fp[fpi].y);
-        }
-        ctx.stroke();
-        // Draw glow endpoint for close paths
-        if (closeness > 0.5 && fp.length > 0) {
-          ctx.fillStyle = 'hsla(' + hue + ', 80%, 70%, ' + (fadeBase * closeness * 0.5) + ')';
+
+        if (isBest) {
+          // Best path: bright white, thick line with glow
+          var bestAlpha = fadeBase * 0.9;
+          ctx.save();
+          ctx.shadowColor = 'rgba(255,255,255,0.6)';
+          ctx.shadowBlur = 8;
+          ctx.strokeStyle = 'rgba(255, 255, 255, ' + bestAlpha + ')';
+          ctx.lineWidth = 3.5;
           ctx.beginPath();
-          ctx.arc(fp[fp.length - 1].x, fp[fp.length - 1].y, 3 + closeness * 3, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.moveTo(fp[0].x, fp[0].y);
+          for (var fpi = 1; fpi < fp.length; fpi++) {
+            ctx.lineTo(fp[fpi].x, fp[fpi].y);
+          }
+          ctx.stroke();
+          ctx.restore();
+          // Bright endpoint glow
+          if (fp.length > 0) {
+            ctx.save();
+            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = 'rgba(255, 255, 255, ' + (fadeBase * 0.7) + ')';
+            ctx.beginPath();
+            ctx.arc(fp[fp.length - 1].x, fp[fp.length - 1].y, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        } else {
+          // Non-best paths: colored by angle, glow by closeness
+          var hue = (fi / this.foresightPaths.length) * 360;
+          var closeness = Math.max(0, 1 - (fp.minHoleDist || 999) / 300);
+          var baseAlpha = 0.03 + closeness * 0.35;
+          var lw = 0.8 + closeness * 2.5;
+          if (fi === snappedIdx) {
+            baseAlpha = 0.8;
+            lw = 3;
+          }
+          var fAlpha = fadeBase * baseAlpha;
+          ctx.strokeStyle = 'hsla(' + hue + ', 80%, ' + (50 + closeness * 30) + '%, ' + fAlpha + ')';
+          ctx.lineWidth = lw;
+          ctx.beginPath();
+          ctx.moveTo(fp[0].x, fp[0].y);
+          for (var fpi = 1; fpi < fp.length; fpi++) {
+            ctx.lineTo(fp[fpi].x, fp[fpi].y);
+          }
+          ctx.stroke();
+          // Glow endpoint for close paths
+          if (closeness > 0.5 && fp.length > 0) {
+            ctx.fillStyle = 'hsla(' + hue + ', 80%, 70%, ' + (fadeBase * closeness * 0.5) + ')';
+            ctx.beginPath();
+            ctx.arc(fp[fp.length - 1].x, fp[fp.length - 1].y, 3 + closeness * 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
     }
