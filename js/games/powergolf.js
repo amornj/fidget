@@ -1,6 +1,6 @@
 const PowerGolfGame = {
   name: 'Powergolf',
-  instructions: 'Drag to aim. Collect powerups! Right-click or press 1-3 to use abilities.',
+  instructions: 'Drag to aim. Q or tab on left to switch clubs. Right-click/1-3 for abilities.',
 
   canvas: null,
   ctx: null,
@@ -45,12 +45,14 @@ const PowerGolfGame = {
   invertTimer: 0,
   foresightPaths: null,
   foresightTimer: 0,
+  invertWipe: null,
   revolverFail: false,
   revolverTimer: 0,
   revolverSavePos: null,
   shards: [],
   lastDryPos: null,
   inWater: false,
+  lobActive: false,
 
   // Ability animations
   clubAnim: null,
@@ -62,7 +64,21 @@ const PowerGolfGame = {
   revolverGunAnim: null,
   atomizerGunPos: null,
   wallDissolve: [],
+  wallDebris: [],
   foresightEyeAnim: null,
+
+  // Club selection
+  clubs: [
+    { id: 'driver', name: 'Driver',  icon: '\u{1F3CC}\u{FE0F}', power: 1.5,  accuracy: 0.12, friction: 0.988, spin: 0,    color: '#e74c3c', headShape: 'driver' },
+    { id: '3wood',  name: '3-Wood',  icon: '\u{1FAB5}',  power: 1.25, accuracy: 0.06, friction: 0.987, spin: 0,    color: '#e67e22', headShape: 'wood' },
+    { id: 'iron',   name: 'Iron',    icon: '\u{2699}\u{FE0F}',  power: 1.0,  accuracy: 0.03, friction: 0.985, spin: 0.02, color: '#95a5a6', headShape: 'iron' },
+    { id: 'wedge',  name: 'Wedge',   icon: '\u{1F53A}',  power: 0.7,  accuracy: 0.015,friction: 0.975, spin: 0.04, color: '#f39c12', headShape: 'wedge' },
+    { id: 'putter', name: 'Putter',  icon: '\u{1F3AF}',  power: 0.4,  accuracy: 0,    friction: 0.96,  spin: 0,    color: '#2ecc71', headShape: 'putter' },
+    { id: 'sandw',  name: 'Sand W.', icon: '\u{23F3}',  power: 0.9,  accuracy: 0.04, friction: 0.978, spin: 0,    color: '#d4a574', headShape: 'sand', lob: true },
+  ],
+  selectedClub: 2,
+  clubPanelOpen: false,
+  swingPending: null,
 
   // All 13 powerup types
   powerupTypes: [
@@ -372,10 +388,10 @@ const PowerGolfGame = {
         { x: 340, y: 180, w: 10, h: 100, moveY: 1, moveRange: 35, moveSpeed: 0.018 },
       ],
       water: [
-        // Central water ring around hole
+        // Central water ring around hole (gap at bottom-left for approach)
         { x: 150, y: 180, w: 100, h: 20 },
-        { x: 150, y: 260, w: 100, h: 20 },
-        { x: 145, y: 200, w: 20, h: 60 },
+        { x: 190, y: 260, w: 60, h: 20 },
+        { x: 145, y: 200, w: 20, h: 40 },
         { x: 240, y: 200, w: 20, h: 60 },
       ],
       rocks: [
@@ -449,6 +465,7 @@ const PowerGolfGame = {
     this.phantomActive = false;
     this.clampTimer = 0;
     this.invertTimer = 0;
+    this.invertWipe = null;
     this.foresightPaths = null;
     this.foresightTimer = 0;
     this.revolverFail = false;
@@ -461,6 +478,7 @@ const PowerGolfGame = {
     this.frameCount = 0;
     this.clubAnim = null;
     this.superShotActive = false;
+    this.lobActive = false;
     this.fireParticles = [];
     this.wrenchAnim = null;
     this.shovelAnim = null;
@@ -468,7 +486,11 @@ const PowerGolfGame = {
     this.revolverGunAnim = null;
     this.atomizerGunPos = null;
     this.wallDissolve = [];
+    this.wallDebris = [];
     this.foresightEyeAnim = null;
+    this.selectedClub = 2;
+    this.clubPanelOpen = false;
+    this.swingPending = null;
     this.loadLevel();
 
     this._onMouseDown = (e) => this.mouseDown(e);
@@ -530,8 +552,10 @@ const PowerGolfGame = {
     this.foresightPaths = null;
     this.foresightTimer = 0;
     this.invertTimer = 0;
+    this.invertWipe = null;
     this.clubAnim = null;
     this.superShotActive = false;
+    this.lobActive = false;
     this.fireParticles = [];
     this.wrenchAnim = null;
     this.shovelAnim = null;
@@ -539,7 +563,9 @@ const PowerGolfGame = {
     this.revolverGunAnim = null;
     this.atomizerGunPos = null;
     this.wallDissolve = [];
+    this.wallDebris = [];
     this.foresightEyeAnim = null;
+    this.swingPending = null;
 
     // Spawn pickups with random types
     this.pickups = (lvl.pickups || []).map(function(p) {
@@ -561,6 +587,13 @@ const PowerGolfGame = {
     if (e.key === '1' && this.abilities.length >= 1) this.useAbility(0);
     else if (e.key === '2' && this.abilities.length >= 2) this.useAbility(1);
     else if (e.key === '3' && this.abilities.length >= 3) this.useAbility(2);
+    else if (e.key === 'q' || e.key === 'Q') {
+      this.selectedClub = (this.selectedClub + 1) % this.clubs.length;
+      var cl = this.clubs[this.selectedClub];
+      this.message = cl.icon + ' ' + cl.name;
+      this.messageTimer = 40;
+      if (typeof SFX !== 'undefined') SFX.click();
+    }
   },
 
   useNextAbility() {
@@ -656,13 +689,13 @@ const PowerGolfGame = {
     }
 
     if (ability.id === 'foresight') {
-      // Flash invert
-      this.invertTimer = 10;
+      // Circle wipe inversion from ball
+      this.invertWipe = { x: this.ball.x, y: this.ball.y, timer: 0, maxTimer: 70 };
       // Compute paths for all angles
       this.foresightPaths = [];
       for (var deg = 0; deg < 360; deg += 2) {
         var rad = deg * Math.PI / 180;
-        var speed = 6;
+        var speed = 6 * this.clubs[this.selectedClub].power;
         var path = this.simulatePath(this.ball.x, this.ball.y, Math.cos(rad) * speed, Math.sin(rad) * speed, 80);
         // Compute min distance to hole for glow brightness
         var minHoleDist = 99999;
@@ -726,7 +759,7 @@ const PowerGolfGame = {
     var by = sy;
     var vx = svx;
     var vy = svy;
-    var friction = 0.985;
+    var friction = this.clubs[this.selectedClub].friction;
     for (var s = 0; s < steps; s++) {
       vx *= friction;
       vy *= friction;
@@ -797,8 +830,33 @@ const PowerGolfGame = {
 
   mouseDown(e) {
     if (e.button !== 0) return;
+    if (this.swingPending) return;
     if (this.revolverFail) return;
     var pos = this.getCanvasPos(e);
+
+    // Club panel handling
+    if (this.clubPanelOpen) {
+      // Check if click is inside panel (x=0, y=80, w=130, h=280)
+      if (pos.x >= 0 && pos.x <= 130 && pos.y >= 80 && pos.y <= 360) {
+        // 22px header, then 6 rows x 42px
+        var rowIdx = Math.floor((pos.y - 102) / 42);
+        if (rowIdx >= 0 && rowIdx < this.clubs.length) {
+          this.selectedClub = rowIdx;
+          this.clubPanelOpen = false;
+          if (typeof SFX !== 'undefined') SFX.click();
+          return;
+        }
+      }
+      // Click outside panel — close it
+      this.clubPanelOpen = false;
+      return;
+    }
+    // Club tab (closed): x=0, y=160, w=24, h=60
+    if (!this.clubPanelOpen && pos.x >= 0 && pos.x <= 24 && pos.y >= 160 && pos.y <= 220) {
+      this.clubPanelOpen = true;
+      if (typeof SFX !== 'undefined') SFX.click();
+      return;
+    }
 
     // Atomizer mode: click on a wall to destroy it
     if (this.atomizerMode) {
@@ -863,7 +921,7 @@ const PowerGolfGame = {
       return;
     }
 
-    if (this.sunk || this.ballMoving()) return;
+    if (this.sunk || this.ballMoving() || this.swingPending || this.clubPanelOpen) return;
     var dx = pos.x - this.ball.x;
     var dy = pos.y - this.ball.y;
     if (Math.sqrt(dx * dx + dy * dy) < 30) {
@@ -920,17 +978,26 @@ const PowerGolfGame = {
     var power = Math.min(Math.sqrt(dx * dx + dy * dy), 150);
     var angle = Math.atan2(dy, dx);
 
-    // Snap to foresight path if one is highlighted
+    // Snap to foresight path if one is highlighted (angle + power to match simulation)
     if (this.foresightSnappedIdx >= 0 && this.foresightPaths && this.foresightTimer > 0) {
       angle = this.foresightPaths[this.foresightSnappedIdx].angle;
+      power = 75; // Match foresight simulation speed (6 / 0.08)
       this.foresightSnappedIdx = -1;
     }
 
-    // Club strike animation
-    this.clubAnim = { phase: 'strike', timer: 12, angle: angle };
+    // Apply club power
+    var club = this.clubs[this.selectedClub];
+    power *= club.power;
+
+    // Apply club accuracy deviation
+    angle += (Math.random() * 2 - 1) * club.accuracy;
+
+    // Club strike animation (15 frames)
+    this.clubAnim = { phase: 'strike', timer: 15, angle: angle };
     if (typeof SFX !== 'undefined') SFX.swing();
 
-    // Apply abilities on shot
+    // Determine abilities for pending shot
+    var ghost = false, bomb = false, magnet = false, curve = false, revolver = false;
     var usedAbility = null;
     if (this.activeAbility && this.activeAbility.id === 'supershot') {
       power *= 2;
@@ -940,12 +1007,16 @@ const PowerGolfGame = {
       if (typeof SFX !== 'undefined') SFX.whoosh();
     } else if (this.activeAbility && this.activeAbility.id === 'revolver') {
       usedAbility = this.consumeActiveAbility();
-      this.ball.revolver = true;
-      this.revolverSavePos = { x: this.ball.x, y: this.ball.y };
-      this.revolverGunAnim = { timer: 20, x: this.ball.x, y: this.ball.y, angle: angle };
-      if (typeof SFX !== 'undefined') SFX.explode();
+      revolver = true;
     } else if (this.activeAbility && ['ghost', 'multiball', 'magnet', 'curve'].indexOf(this.activeAbility.id) !== -1) {
       usedAbility = this.consumeActiveAbility();
+    }
+
+    if (usedAbility) {
+      ghost = usedAbility.id === 'ghost';
+      bomb = usedAbility.id === 'multiball';
+      magnet = usedAbility.id === 'magnet';
+      curve = usedAbility.id === 'curve';
     }
 
     // Consume phantom preview
@@ -953,15 +1024,9 @@ const PowerGolfGame = {
       this.phantomActive = false;
     }
 
-    this.ball.vx = Math.cos(angle) * power * 0.08;
-    this.ball.vy = Math.sin(angle) * power * 0.08;
-
-    // Tag ball with active effects
-    this.ball.ghost = usedAbility && usedAbility.id === 'ghost';
-    this.ball.ghostHits = 1;
-    this.ball.bomb = usedAbility && usedAbility.id === 'multiball';
-    this.ball.magnet = usedAbility && usedAbility.id === 'magnet';
-    this.ball.curve = usedAbility && usedAbility.id === 'curve';
+    // Store pending shot — ball launches at frame 7 of 15
+    var club = this.clubs[this.selectedClub];
+    this.swingPending = { power: power, angle: angle, ghost: ghost, bomb: bomb, magnet: magnet, curve: curve, revolver: revolver, lob: !!club.lob, timer: 15 };
 
     this.strokes++;
     this.totalStrokes++;
@@ -970,7 +1035,6 @@ const PowerGolfGame = {
     this.lastDryPos = { x: this.ball.x, y: this.ball.y };
     this.inWater = false;
 
-    if (typeof SFX !== 'undefined') SFX.hit();
     this.updateScore();
   },
 
@@ -1008,6 +1072,38 @@ const PowerGolfGame = {
     if (this.messageTimer > 0) this.messageTimer--;
     if (this.invertTimer > 0) this.invertTimer--;
     if (this.foresightTimer > 0) this.foresightTimer--;
+    if (this.invertWipe) {
+      this.invertWipe.timer++;
+      if (this.invertWipe.timer >= this.invertWipe.maxTimer) this.invertWipe = null;
+    }
+
+    // Swing pending resolution
+    if (this.swingPending) {
+      this.swingPending.timer--;
+      if (this.swingPending.timer === 7) {
+        // Contact point — launch ball
+        var sp = this.swingPending;
+        this.ball.vx = Math.cos(sp.angle) * sp.power * 0.08;
+        this.ball.vy = Math.sin(sp.angle) * sp.power * 0.08;
+        this.ball.ghost = sp.ghost;
+        this.ball.ghostHits = 1;
+        this.ball.bomb = sp.bomb;
+        this.ball.magnet = sp.magnet;
+        this.ball.curve = sp.curve;
+        this.ball.revolver = sp.revolver;
+        this.lobActive = sp.lob;
+        if (this.lobActive) {
+          this.ball.r = 12;
+        }
+        if (sp.revolver) {
+          this.revolverSavePos = { x: this.ball.x, y: this.ball.y };
+          this.revolverGunAnim = { timer: 20, x: this.ball.x, y: this.ball.y, angle: sp.angle };
+          if (typeof SFX !== 'undefined') SFX.explode();
+        }
+        if (typeof SFX !== 'undefined') SFX.hit();
+      }
+      if (this.swingPending.timer <= 0) this.swingPending = null;
+    }
 
     // Clamp timer
     if (this.clampTimer > 0) {
@@ -1043,6 +1139,19 @@ const PowerGolfGame = {
     }
     this.shards = newShards;
 
+    // Wall debris update (bomb halves falling)
+    var newDebris = [];
+    for (var wdi2 = 0; wdi2 < this.wallDebris.length; wdi2++) {
+      var wd2 = this.wallDebris[wdi2];
+      wd2.x += wd2.vx;
+      wd2.y += wd2.vy;
+      wd2.vy += wd2.gravity;
+      wd2.rot += wd2.vrot;
+      wd2.life--;
+      if (wd2.life > 0) newDebris.push(wd2);
+    }
+    this.wallDebris = newDebris;
+
     // Club animation update
     if (this.clubAnim) {
       if (this.clubAnim.phase === 'windup') {
@@ -1068,6 +1177,10 @@ const PowerGolfGame = {
     }
     if (!this.ballMoving() && this.superShotActive) {
       this.superShotActive = false;
+    }
+    if (!this.ballMoving() && this.lobActive) {
+      this.lobActive = false;
+      this.ball.r = this.clampOrigR;
     }
     var newFire = [];
     for (var ffi = 0; ffi < this.fireParticles.length; ffi++) {
@@ -1216,7 +1329,7 @@ const PowerGolfGame = {
     }
 
     var b = this.ball;
-    var friction = 0.985;
+    var friction = this.clubs[this.selectedClub].friction;
     b.vx *= friction;
     b.vy *= friction;
     if (Math.abs(b.vx) < 0.1) b.vx = 0;
@@ -1233,18 +1346,31 @@ const PowerGolfGame = {
       }
     }
 
-    // Curve effect
+    // Curve effect — stronger pull that intensifies as ball gets closer
     if (b.curve && this.ballMoving()) {
       var cdx = this.hole.x - b.x;
       var cdy = this.hole.y - b.y;
       var cdist = Math.sqrt(cdx * cdx + cdy * cdy);
       if (cdist > 10) {
-        b.vx += (cdx / cdist) * 0.03;
-        b.vy += (cdy / cdist) * 0.03;
+        var curveStr = 0.10 + 0.15 * (1 - Math.min(cdist / 300, 1));
+        b.vx += (cdx / cdist) * curveStr;
+        b.vy += (cdy / cdist) * curveStr;
       }
     }
 
-    // Sub-step movement to prevent skipping over the hole
+    // Club spin effect (pull toward hole)
+    var clubSpin = this.clubs[this.selectedClub].spin;
+    if (clubSpin > 0 && this.ballMoving()) {
+      var spdx = this.hole.x - b.x;
+      var spdy = this.hole.y - b.y;
+      var spdist = Math.sqrt(spdx * spdx + spdy * spdy);
+      if (spdist > 10) {
+        b.vx += (spdx / spdist) * clubSpin;
+        b.vy += (spdy / spdist) * clubSpin;
+      }
+    }
+
+    // Sub-step movement — all collisions checked per step to prevent tunneling
     var speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
     var subSteps = speed > 4 ? Math.ceil(speed / 3) : 1;
     var svx = b.vx / subSteps;
@@ -1252,6 +1378,155 @@ const PowerGolfGame = {
     for (var ss = 0; ss < subSteps; ss++) {
       b.x += svx;
       b.y += svy;
+
+      // Boundary clamping — bounce off canvas edges
+      var edgeDamp = this.lobActive ? 0.85 : 0.7;
+      if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * edgeDamp; svx = b.vx / subSteps; }
+      if (b.x > 400 - b.r) { b.x = 400 - b.r; b.vx = -Math.abs(b.vx) * edgeDamp; svx = b.vx / subSteps; }
+      if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy) * edgeDamp; svy = b.vy / subSteps; }
+      if (b.y > 460 - b.r) { b.y = 460 - b.r; b.vy = -Math.abs(b.vy) * edgeDamp; svy = b.vy / subSteps; }
+
+      // Wall collisions (skipped during lob — ball flies over walls)
+      if (!this.lobActive)
+      for (var wi = 0; wi < this.walls.length; wi++) {
+        var w = this.walls[wi];
+        if (w.destroyed) continue;
+
+        var closestX = Math.max(w.x, Math.min(b.x, w.x + w.w));
+        var closestY = Math.max(w.y, Math.min(b.y, w.y + w.h));
+        var wdx = b.x - closestX;
+        var wdy = b.y - closestY;
+        var wdist = Math.sqrt(wdx * wdx + wdy * wdy);
+
+        if (wdist < b.r) {
+          // Bomb - destroy wall with split animation
+          if (b.bomb) {
+            w.destroyed = true;
+            b.bomb = false;
+            b.x += svx * 2;
+            b.y += svy * 2;
+            // Split wall into two debris halves at impact point
+            var isHoriz = w.w >= w.h;
+            if (isHoriz) {
+              var splitX = Math.max(w.x + 4, Math.min(closestX, w.x + w.w - 4));
+              var leftW = splitX - w.x;
+              var rightW = w.w - leftW;
+              // Left half flies left and up
+              this.wallDebris.push({
+                x: w.x + leftW / 2, y: w.y + w.h / 2,
+                w: leftW, h: w.h,
+                vx: -1.5 - Math.random(), vy: -2 - Math.random() * 2,
+                rot: 0, vrot: -0.04 - Math.random() * 0.06, gravity: 0.12, life: 80
+              });
+              // Right half flies right and up
+              this.wallDebris.push({
+                x: splitX + rightW / 2, y: w.y + w.h / 2,
+                w: rightW, h: w.h,
+                vx: 1.5 + Math.random(), vy: -2 - Math.random() * 2,
+                rot: 0, vrot: 0.04 + Math.random() * 0.06, gravity: 0.12, life: 80
+              });
+            } else {
+              var splitY = Math.max(w.y + 4, Math.min(closestY, w.y + w.h - 4));
+              var topH = splitY - w.y;
+              var botH = w.h - topH;
+              // Top half flies up
+              this.wallDebris.push({
+                x: w.x + w.w / 2, y: w.y + topH / 2,
+                w: w.w, h: topH,
+                vx: -0.5 + Math.random(), vy: -3 - Math.random() * 2,
+                rot: 0, vrot: -0.04 - Math.random() * 0.06, gravity: 0.12, life: 80
+              });
+              // Bottom half flies down
+              this.wallDebris.push({
+                x: w.x + w.w / 2, y: splitY + botH / 2,
+                w: w.w, h: botH,
+                vx: 0.5 - Math.random(), vy: -1 - Math.random(),
+                rot: 0, vrot: 0.04 + Math.random() * 0.06, gravity: 0.12, life: 80
+              });
+            }
+            // Splinters at break point
+            for (var spi = 0; spi < 10; spi++) {
+              var spAngle = Math.random() * Math.PI * 2;
+              var spSpeed = 1 + Math.random() * 3;
+              this.shards.push({
+                x: closestX, y: closestY,
+                points: [
+                  { x: 0, y: -2 - Math.random() * 4 },
+                  { x: 1 + Math.random(), y: 0 },
+                  { x: 0, y: 2 + Math.random() * 4 },
+                  { x: -1 - Math.random(), y: 0 },
+                ],
+                vx: Math.cos(spAngle) * spSpeed,
+                vy: Math.sin(spAngle) * spSpeed - 2,
+                rot: Math.random() * Math.PI * 2,
+                vrot: (Math.random() - 0.5) * 0.4,
+                life: 40 + Math.floor(Math.random() * 20),
+                color: ['#8b6914', '#5a3a1a', '#a0822a', '#d4a574'][Math.floor(Math.random() * 4)],
+              });
+            }
+            this.spawnParticles(closestX, closestY, '#ff9f43', 25);
+            if (typeof SFX !== 'undefined') SFX.explode();
+            this.message = 'BOOM!';
+            this.messageTimer = 30;
+            continue;
+          }
+
+          // Ghost - pass through once
+          if (b.ghost && b.ghostHits > 0) {
+            b.ghostHits--;
+            if (b.ghostHits <= 0) b.ghost = false;
+            this.spawnParticles(closestX, closestY, '#a29bfe', 10);
+            continue;
+          }
+
+          // Normal bounce
+          if (wdist === 0) {
+            b.x = w.x - b.r;
+            b.vx = -Math.abs(b.vx) * 0.7;
+          } else {
+            var woverlap = b.r - wdist;
+            var wnx = wdx / wdist;
+            var wny = wdy / wdist;
+            b.x += wnx * woverlap;
+            b.y += wny * woverlap;
+
+            var wdot = b.vx * wnx + b.vy * wny;
+            b.vx -= 2 * wdot * wnx;
+            b.vy -= 2 * wdot * wny;
+            b.vx *= 0.7;
+            b.vy *= 0.7;
+          }
+          svx = b.vx / subSteps;
+          svy = b.vy / subSteps;
+          if (typeof SFX !== 'undefined') SFX.bounce();
+        }
+      }
+
+      // Rock collisions
+      for (var ri = 0; ri < this.rocks.length; ri++) {
+        var rk = this.rocks[ri];
+        var rdx = b.x - rk.x;
+        var rdy = b.y - rk.y;
+        var rdist = Math.sqrt(rdx * rdx + rdy * rdy);
+        if (rdist < rk.r + b.r) {
+          if (rdist > 0) {
+            var rnx = rdx / rdist;
+            var rny = rdy / rdist;
+            b.x = rk.x + rnx * (rk.r + b.r);
+            b.y = rk.y + rny * (rk.r + b.r);
+            var rdot = b.vx * rnx + b.vy * rny;
+            b.vx -= 2 * rdot * rnx;
+            b.vy -= 2 * rdot * rny;
+            b.vx *= 1.2;
+            b.vy *= 1.2;
+            svx = b.vx / subSteps;
+            svy = b.vy / subSteps;
+            this.spawnParticles(rk.x + rnx * rk.r, rk.y + rny * rk.r, '#999', 5);
+            if (typeof SFX !== 'undefined') SFX.bounce();
+          }
+        }
+      }
+
       // Check hole proximity during each substep — pull toward hole when close
       var pullDx = this.hole.x - b.x;
       var pullDy = this.hole.y - b.y;
@@ -1272,14 +1547,14 @@ const PowerGolfGame = {
           return;
         }
       }
-    }
-    // Also check extra holes during substeps
-    for (var ehi2 = 0; ehi2 < this.extraHoles.length; ehi2++) {
-      var eh2 = this.extraHoles[ehi2];
-      var ehd = Math.sqrt((b.x - eh2.x) * (b.x - eh2.x) + (b.y - eh2.y) * (b.y - eh2.y));
-      if (ehd < eh2.r - 1 && Math.sqrt(b.vx * b.vx + b.vy * b.vy) < 10) {
-        this.sinkBall();
-        return;
+      // Extra holes check
+      for (var ehi2 = 0; ehi2 < this.extraHoles.length; ehi2++) {
+        var eh2 = this.extraHoles[ehi2];
+        var ehd = Math.sqrt((b.x - eh2.x) * (b.x - eh2.x) + (b.y - eh2.y) * (b.y - eh2.y));
+        if (ehd < eh2.r - 1 && Math.sqrt(b.vx * b.vx + b.vy * b.vy) < 10) {
+          this.sinkBall();
+          return;
+        }
       }
     }
 
@@ -1337,85 +1612,6 @@ const PowerGolfGame = {
       if (this.trail[ti].life > 0) newTrail.push(this.trail[ti]);
     }
     this.trail = newTrail;
-
-    // Wall collisions
-    for (var wi = 0; wi < this.walls.length; wi++) {
-      var w = this.walls[wi];
-      if (w.destroyed) continue;
-
-      var closestX = Math.max(w.x, Math.min(b.x, w.x + w.w));
-      var closestY = Math.max(w.y, Math.min(b.y, w.y + w.h));
-      var wdx = b.x - closestX;
-      var wdy = b.y - closestY;
-      var wdist = Math.sqrt(wdx * wdx + wdy * wdy);
-
-      if (wdist < b.r) {
-        // Bomb - destroy wall
-        if (b.bomb) {
-          w.destroyed = true;
-          b.bomb = false;
-          // Push ball past the wall so it doesn't vanish
-          b.x += b.vx * 2;
-          b.y += b.vy * 2;
-          this.spawnParticles(closestX, closestY, '#ff9f43', 25);
-          if (typeof SFX !== 'undefined') SFX.explode();
-          this.message = 'BOOM!';
-          this.messageTimer = 30;
-          continue;
-        }
-
-        // Ghost - pass through once
-        if (b.ghost && b.ghostHits > 0) {
-          b.ghostHits--;
-          if (b.ghostHits <= 0) b.ghost = false;
-          this.spawnParticles(closestX, closestY, '#a29bfe', 10);
-          continue;
-        }
-
-        // Normal bounce
-        if (wdist === 0) {
-          b.x = w.x - b.r;
-          b.vx = -Math.abs(b.vx) * 0.7;
-        } else {
-          var woverlap = b.r - wdist;
-          var wnx = wdx / wdist;
-          var wny = wdy / wdist;
-          b.x += wnx * woverlap;
-          b.y += wny * woverlap;
-
-          var wdot = b.vx * wnx + b.vy * wny;
-          b.vx -= 2 * wdot * wnx;
-          b.vy -= 2 * wdot * wny;
-          b.vx *= 0.7;
-          b.vy *= 0.7;
-        }
-        if (typeof SFX !== 'undefined') SFX.bounce();
-      }
-    }
-
-    // Rock collisions
-    for (var ri = 0; ri < this.rocks.length; ri++) {
-      var rk = this.rocks[ri];
-      var rdx = b.x - rk.x;
-      var rdy = b.y - rk.y;
-      var rdist = Math.sqrt(rdx * rdx + rdy * rdy);
-      if (rdist < rk.r + b.r) {
-        if (rdist > 0) {
-          var rnx = rdx / rdist;
-          var rny = rdy / rdist;
-          b.x = rk.x + rnx * (rk.r + b.r);
-          b.y = rk.y + rny * (rk.r + b.r);
-          var rdot = b.vx * rnx + b.vy * rny;
-          b.vx -= 2 * rdot * rnx;
-          b.vy -= 2 * rdot * rny;
-          // 1.2x bumper force
-          b.vx *= 1.2;
-          b.vy *= 1.2;
-          this.spawnParticles(rk.x + rnx * rk.r, rk.y + rny * rk.r, '#999', 5);
-          if (typeof SFX !== 'undefined') SFX.bounce();
-        }
-      }
-    }
 
     // Pickup collisions
     for (var pki = 0; pki < this.pickups.length; pki++) {
@@ -1497,15 +1693,6 @@ const PowerGolfGame = {
   draw() {
     var ctx = this.ctx;
     var canvas = this.canvas;
-
-    // Invert flash for foresight
-    if (this.invertTimer > 0) {
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'rgba(0,0,0,0.8)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      return;
-    }
 
     // Revolver grayscale overlay
     var doGrayscale = this.revolverFail;
@@ -1591,6 +1778,29 @@ const PowerGolfGame = {
           ctx.fillText('\u2195', wcx, wcy + 3);
         }
       }
+    }
+
+    // Wall debris (bomb split halves — spin and fall)
+    for (var wdri = 0; wdri < this.wallDebris.length; wdri++) {
+      var wd = this.wallDebris[wdri];
+      ctx.save();
+      ctx.translate(wd.x, wd.y);
+      ctx.rotate(wd.rot);
+      ctx.globalAlpha = Math.min(1, wd.life / 30);
+      ctx.fillStyle = '#5a3a1a';
+      ctx.fillRect(-wd.w / 2, -wd.h / 2, wd.w, wd.h);
+      // Wood grain highlight
+      ctx.fillStyle = '#7a5a2a';
+      ctx.fillRect(-wd.w / 2, -wd.h / 2, wd.w, 2);
+      // Jagged break edge
+      ctx.fillStyle = '#8b6914';
+      var edgeX = (wd.vx < 0) ? wd.w / 2 : -wd.w / 2;
+      for (var ji = 0; ji < 3; ji++) {
+        var jy = -wd.h / 2 + (ji + 0.5) * (wd.h / 3);
+        ctx.fillRect(edgeX - 1, jy - 1, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+      ctx.restore();
     }
 
     // Rocks
@@ -1777,7 +1987,19 @@ const PowerGolfGame = {
     if (!this.sunk && !this.revolverFail) {
       var b = this.ball;
 
+      // Lob shadow on ground
+      if (this.lobActive && this.ballMoving()) {
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(b.x + 4, b.y + 6, b.r * 0.8, b.r * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       // Ball glow for active effects
+      if (this.lobActive) {
+        ctx.shadowColor = '#d4a574';
+        ctx.shadowBlur = 10;
+      }
       if (b.ghost || b.magnet || b.bomb || b.curve || b.revolver) {
         var glowColor = '#fff';
         if (b.ghost) glowColor = '#a29bfe';
@@ -1832,14 +2054,43 @@ const PowerGolfGame = {
         cAngle = this.clubAnim.angle;
       }
       ctx.rotate(cAngle);
-      var clubAlpha = this.clubAnim.phase === 'strike' ? this.clubAnim.timer / 12 : 1;
+      var clubAlpha = this.clubAnim.phase === 'strike' ? this.clubAnim.timer / 15 : 1;
       ctx.globalAlpha = clubAlpha;
       // Shaft
       ctx.fillStyle = '#8B6914';
       ctx.fillRect(10, -2, 35, 4);
-      // Head
-      ctx.fillStyle = '#ccc';
-      ctx.fillRect(45, -5, 10, 10);
+      // Club head — shape varies by selected club
+      var headShape = this.clubs[this.selectedClub].headShape;
+      ctx.fillStyle = this.clubs[this.selectedClub].color;
+      if (headShape === 'driver') {
+        ctx.beginPath();
+        ctx.arc(49, 0, 8, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (headShape === 'wood') {
+        ctx.beginPath();
+        ctx.arc(48, 0, 6, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (headShape === 'iron') {
+        ctx.fillRect(45, -5, 10, 10);
+      } else if (headShape === 'wedge') {
+        ctx.beginPath();
+        ctx.moveTo(45, -6);
+        ctx.lineTo(56, -3);
+        ctx.lineTo(56, 3);
+        ctx.lineTo(45, 6);
+        ctx.closePath();
+        ctx.fill();
+      } else if (headShape === 'putter') {
+        ctx.fillRect(45, -7, 4, 14);
+      } else if (headShape === 'sand') {
+        ctx.beginPath();
+        ctx.moveTo(45, -7);
+        ctx.lineTo(55, -4);
+        ctx.lineTo(55, 4);
+        ctx.lineTo(45, 7);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.globalAlpha = 1;
       ctx.restore();
     }
@@ -1936,7 +2187,7 @@ const PowerGolfGame = {
     if (this.phantomActive && this.dragging && this.dragEnd) {
       var pdx = this.dragEnd.x - this.dragStart.x;
       var pdy = this.dragEnd.y - this.dragStart.y;
-      var ppower = Math.min(Math.sqrt(pdx * pdx + pdy * pdy), 150);
+      var ppower = Math.min(Math.sqrt(pdx * pdx + pdy * pdy), 150) * this.clubs[this.selectedClub].power;
       var pangle = Math.atan2(pdy, pdx);
       var pvx = Math.cos(pangle) * ppower * 0.08;
       var pvy = Math.sin(pangle) * ppower * 0.08;
@@ -1962,7 +2213,8 @@ const PowerGolfGame = {
       var ddy = this.dragEnd.y - this.dragStart.y;
       var dpower = Math.min(Math.sqrt(ddx * ddx + ddy * ddy), 150);
       var dangle = Math.atan2(ddy, ddx);
-      var displayPower = this.activeAbility && this.activeAbility.id === 'supershot' ? dpower * 2 : dpower;
+      var displayPower = dpower * this.clubs[this.selectedClub].power;
+      if (this.activeAbility && this.activeAbility.id === 'supershot') displayPower *= 2;
 
       ctx.strokeStyle = 'rgba(255, ' + Math.round(255 - displayPower * 1.2) + ', 50, 0.8)';
       ctx.lineWidth = 3;
@@ -2083,6 +2335,85 @@ const PowerGolfGame = {
       ctx.fillText(this.activeAbility.icon + ' ' + this.activeAbility.name + ' ACTIVE', canvas.width / 2, barY - 5);
     }
 
+    // Selected club indicator (top-right badge)
+    var selClub = this.clubs[this.selectedClub];
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.roundRect(canvas.width - 90, 4, 86, 20, 4);
+    ctx.fill();
+    ctx.fillStyle = selClub.color;
+    ctx.font = 'bold 10px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(selClub.icon + ' ' + selClub.name, canvas.width - 8, 18);
+
+    // Club tab (left edge, visible when panel closed)
+    if (!this.clubPanelOpen) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.beginPath();
+      ctx.roundRect(0, 160, 24, 60, [0, 6, 6, 0]);
+      ctx.fill();
+      ctx.fillStyle = selClub.color;
+      ctx.fillRect(0, 160, 3, 60);
+      ctx.font = '14px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(selClub.icon, 12, 186);
+      ctx.fillStyle = '#aaa';
+      ctx.font = '10px system-ui';
+      ctx.fillText('\u{25B6}', 12, 210);
+    }
+
+    // Club panel (when open)
+    if (this.clubPanelOpen) {
+      ctx.fillStyle = 'rgba(0,0,0,0.85)';
+      ctx.beginPath();
+      ctx.roundRect(0, 80, 130, 280, [0, 8, 8, 0]);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(0, 80, 130, 280, [0, 8, 8, 0]);
+      ctx.stroke();
+      // Header
+      ctx.fillStyle = '#aaa';
+      ctx.font = 'bold 10px system-ui';
+      ctx.textAlign = 'left';
+      ctx.fillText('SELECT CLUB', 8, 97);
+      // Club rows
+      for (var ci = 0; ci < this.clubs.length; ci++) {
+        var cl = this.clubs[ci];
+        var rowY = 102 + ci * 42;
+        var isSelected = (ci === this.selectedClub);
+        // Row background
+        if (isSelected) {
+          ctx.fillStyle = 'rgba(255,255,255,0.1)';
+          ctx.fillRect(0, rowY, 130, 42);
+          ctx.fillStyle = cl.color;
+          ctx.fillRect(0, rowY, 3, 42);
+        }
+        // Icon + name
+        ctx.font = '14px system-ui';
+        ctx.textAlign = 'left';
+        ctx.fillText(cl.icon, 8, rowY + 18);
+        ctx.fillStyle = isSelected ? '#fff' : '#bbb';
+        ctx.font = 'bold 11px system-ui';
+        ctx.fillText(cl.name, 28, rowY + 17);
+        // Power bar
+        ctx.fillStyle = '#333';
+        ctx.fillRect(28, rowY + 24, 70, 5);
+        ctx.fillStyle = cl.color;
+        ctx.fillRect(28, rowY + 24, 70 * (cl.power / 1.5), 5);
+        // Accuracy label
+        ctx.fillStyle = '#888';
+        ctx.font = '8px system-ui';
+        ctx.textAlign = 'right';
+        if (cl.accuracy === 0) {
+          ctx.fillText('Perfect', 125, rowY + 30);
+        } else {
+          ctx.fillText('\u{00B1}' + (cl.accuracy * 180 / Math.PI).toFixed(1) + '\u{00B0}', 125, rowY + 30);
+        }
+      }
+    }
+
     // Teleport mode indicator
     if (this.teleportMode) {
       ctx.fillStyle = 'rgba(0,210,211,0.15)';
@@ -2117,6 +2448,34 @@ const PowerGolfGame = {
       ctx.font = 'bold 22px system-ui';
       ctx.textAlign = 'center';
       ctx.fillText(this.message, canvas.width / 2, canvas.height / 2 - 30);
+    }
+
+    // Foresight circle wipe inversion
+    if (this.invertWipe) {
+      var iw = this.invertWipe;
+      var t = iw.timer;
+      var maxR = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
+      var radius;
+      if (t < 30) {
+        // Expand from ball
+        radius = (t / 30) * maxR;
+      } else if (t < 45) {
+        // Hold at full
+        radius = maxR;
+      } else {
+        // Collapse back to ball
+        radius = (1 - (t - 45) / 25) * maxR;
+      }
+      if (radius > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'difference';
+        ctx.beginPath();
+        ctx.arc(iw.x, iw.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+      }
     }
   },
 

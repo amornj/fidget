@@ -1,6 +1,6 @@
 const GolfGame = {
   name: 'Mini Golf',
-  instructions: 'Click & drag from the ball to aim and set power. Release to shoot!',
+  instructions: 'Drag to aim & shoot. Q/Tab to switch clubs. Click tab on left for club panel.',
 
   canvas: null,
   ctx: null,
@@ -24,6 +24,19 @@ const GolfGame = {
   frameCount: 0,
   lastDryPos: null,
   inWater: false,
+  lobActive: false,
+
+  // Club selection
+  clubs: [
+    { id: 'driver', name: 'Driver',  icon: '\u{1F3CC}\u{FE0F}', power: 1.5,  accuracy: 0.12, friction: 0.988, color: '#e74c3c' },
+    { id: '3wood',  name: '3-Wood',  icon: '\u{1FAB5}',  power: 1.25, accuracy: 0.06, friction: 0.987, color: '#e67e22' },
+    { id: 'iron',   name: 'Iron',    icon: '\u{2699}\u{FE0F}',  power: 1.0,  accuracy: 0.03, friction: 0.985, color: '#95a5a6' },
+    { id: 'wedge',  name: 'Wedge',   icon: '\u{1F53A}',  power: 0.7,  accuracy: 0.015,friction: 0.975, color: '#f39c12' },
+    { id: 'putter', name: 'Putter',  icon: '\u{1F3AF}',  power: 0.4,  accuracy: 0,    friction: 0.96,  color: '#2ecc71' },
+    { id: 'sandw',  name: 'Sand W.', icon: '\u{23F3}',   power: 0.9,  accuracy: 0.04, friction: 0.978, color: '#d4a574', lob: true },
+  ],
+  selectedClub: 2,
+  clubPanelOpen: false,
 
   levels: [
     // Level 1 - straight shot
@@ -196,14 +209,18 @@ const GolfGame = {
     this.level = 0;
     this.totalStrokes = 0;
     this.frameCount = 0;
+    this.selectedClub = 2;
+    this.clubPanelOpen = false;
     this.loadLevel();
 
     this._onMouseDown = (e) => this.mouseDown(e);
     this._onMouseMove = (e) => this.mouseMove(e);
     this._onMouseUp = (e) => this.mouseUp(e);
+    this._onKeyDown = (e) => this.handleKey(e);
     canvas.addEventListener('mousedown', this._onMouseDown);
     canvas.addEventListener('mousemove', this._onMouseMove);
     canvas.addEventListener('mouseup', this._onMouseUp);
+    window.addEventListener('keydown', this._onKeyDown);
 
     this.loop();
   },
@@ -221,6 +238,7 @@ const GolfGame = {
     this.water = (lvl.water || []).map(w => ({ ...w }));
     this.strokes = 0;
     this.sunk = false;
+    this.lobActive = false;
     this.inWater = false;
     this.lastDryPos = { x: this.ball.x, y: this.ball.y };
     this.message = `Hole ${this.level + 1}`;
@@ -238,9 +256,42 @@ const GolfGame = {
     };
   },
 
+  handleKey(e) {
+    if (e.key === 'q' || e.key === 'Q' || e.key === 'Tab') {
+      e.preventDefault();
+      this.selectedClub = (this.selectedClub + 1) % this.clubs.length;
+      var cl = this.clubs[this.selectedClub];
+      this.message = cl.icon + ' ' + cl.name;
+      this.messageTimer = 40;
+      if (typeof SFX !== 'undefined') SFX.click();
+    }
+  },
+
   mouseDown(e) {
-    if (this.sunk || this.ballMoving()) return;
     const pos = this.getCanvasPos(e);
+
+    // Club panel handling
+    if (this.clubPanelOpen) {
+      if (pos.x >= 0 && pos.x <= 120 && pos.y >= 80 && pos.y <= 80 + 20 + this.clubs.length * 38) {
+        var rowIdx = Math.floor((pos.y - 100) / 38);
+        if (rowIdx >= 0 && rowIdx < this.clubs.length) {
+          this.selectedClub = rowIdx;
+          this.clubPanelOpen = false;
+          if (typeof SFX !== 'undefined') SFX.click();
+          return;
+        }
+      }
+      this.clubPanelOpen = false;
+      return;
+    }
+    // Club tab (closed)
+    if (pos.x >= 0 && pos.x <= 24 && pos.y >= 160 && pos.y <= 220) {
+      this.clubPanelOpen = true;
+      if (typeof SFX !== 'undefined') SFX.click();
+      return;
+    }
+
+    if (this.sunk || this.ballMoving()) return;
     const dx = pos.x - this.ball.x;
     const dy = pos.y - this.ball.y;
     if (Math.sqrt(dx * dx + dy * dy) < 30) {
@@ -262,10 +313,18 @@ const GolfGame = {
     const end = this.getCanvasPos(e);
     let dx = end.x - this.dragStart.x;
     let dy = end.y - this.dragStart.y;
-    const power = Math.min(Math.sqrt(dx * dx + dy * dy), 150);
-    const angle = Math.atan2(dy, dx);
+    const club = this.clubs[this.selectedClub];
+    const power = Math.min(Math.sqrt(dx * dx + dy * dy), 150) * club.power;
+    let angle = Math.atan2(dy, dx);
+    angle += (Math.random() * 2 - 1) * club.accuracy;
     this.ball.vx = Math.cos(angle) * power * 0.08;
     this.ball.vy = Math.sin(angle) * power * 0.08;
+    this.lobActive = !!club.lob;
+    if (this.lobActive) {
+      this.ball.r = 12;
+    } else {
+      this.ball.r = 8;
+    }
     this.lastDryPos = { x: this.ball.x, y: this.ball.y };
     this.strokes++;
     this.totalStrokes++;
@@ -317,11 +376,17 @@ const GolfGame = {
     }
 
     const b = this.ball;
-    const friction = 0.985;
+    const friction = this.clubs[this.selectedClub].friction;
     b.vx *= friction;
     b.vy *= friction;
     if (Math.abs(b.vx) < 0.1) b.vx = 0;
     if (Math.abs(b.vy) < 0.1) b.vy = 0;
+
+    // Reset lob state and ball size when stopped
+    if (!this.ballMoving() && this.lobActive) {
+      this.lobActive = false;
+      b.r = 8;
+    }
 
     // Track dry position
     if (this.ballMoving() && !this.isInWater(b.x, b.y)) {
@@ -372,31 +437,41 @@ const GolfGame = {
       this.inWater = false;
     }
 
-    // Wall collisions
-    for (const w of this.walls) {
-      const closestX = Math.max(w.x, Math.min(b.x, w.x + w.w));
-      const closestY = Math.max(w.y, Math.min(b.y, w.y + w.h));
-      const dx = b.x - closestX;
-      const dy = b.y - closestY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+    // Lob shots bounce off canvas edges instead of walls
+    if (this.lobActive) {
+      if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.85; }
+      if (b.x > 400 - b.r) { b.x = 400 - b.r; b.vx = -Math.abs(b.vx) * 0.85; }
+      if (b.y < b.r) { b.y = b.r; b.vy = Math.abs(b.vy) * 0.85; }
+      if (b.y > 460 - b.r) { b.y = 460 - b.r; b.vy = -Math.abs(b.vy) * 0.85; }
+    }
 
-      if (dist < b.r) {
-        if (typeof SFX !== 'undefined') SFX.bounce();
-        if (dist === 0) {
-          b.x = w.x - b.r;
-          b.vx = -Math.abs(b.vx) * 0.7;
-        } else {
-          const overlap = b.r - dist;
-          const nx = dx / dist;
-          const ny = dy / dist;
-          b.x += nx * overlap;
-          b.y += ny * overlap;
+    // Wall collisions (skipped during lob — ball flies over walls)
+    if (!this.lobActive) {
+      for (const w of this.walls) {
+        const closestX = Math.max(w.x, Math.min(b.x, w.x + w.w));
+        const closestY = Math.max(w.y, Math.min(b.y, w.y + w.h));
+        const dx = b.x - closestX;
+        const dy = b.y - closestY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-          const dot = b.vx * nx + b.vy * ny;
-          b.vx -= 2 * dot * nx;
-          b.vy -= 2 * dot * ny;
-          b.vx *= 0.7;
-          b.vy *= 0.7;
+        if (dist < b.r) {
+          if (typeof SFX !== 'undefined') SFX.bounce();
+          if (dist === 0) {
+            b.x = w.x - b.r;
+            b.vx = -Math.abs(b.vx) * 0.7;
+          } else {
+            const overlap = b.r - dist;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            b.x += nx * overlap;
+            b.y += ny * overlap;
+
+            const dot = b.vx * nx + b.vy * ny;
+            b.vx -= 2 * dot * nx;
+            b.vy -= 2 * dot * ny;
+            b.vx *= 0.7;
+            b.vy *= 0.7;
+          }
         }
       }
     }
@@ -541,11 +616,18 @@ const GolfGame = {
     // Ball
     if (!this.sunk) {
       const b = this.ball;
+      // Lob shadow on ground
+      if (this.lobActive && this.ballMoving()) {
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(b.x + 4, b.y + 6, b.r * 0.8, b.r * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.fillStyle = '#fff';
       ctx.shadowColor = 'rgba(0,0,0,0.3)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
+      ctx.shadowBlur = this.lobActive ? 8 : 4;
+      ctx.shadowOffsetX = this.lobActive ? 4 : 2;
+      ctx.shadowOffsetY = this.lobActive ? 4 : 2;
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
       ctx.fill();
@@ -563,17 +645,18 @@ const GolfGame = {
     if (this.dragging && this.dragEnd) {
       const dx = this.dragEnd.x - this.dragStart.x;
       const dy = this.dragEnd.y - this.dragStart.y;
-      const power = Math.min(Math.sqrt(dx * dx + dy * dy), 150);
+      const rawPower = Math.min(Math.sqrt(dx * dx + dy * dy), 150);
+      const displayPower = rawPower * this.clubs[this.selectedClub].power;
       const angle = Math.atan2(dy, dx);
 
-      ctx.strokeStyle = `rgba(255, ${Math.round(255 - power * 1.5)}, 50, 0.8)`;
+      ctx.strokeStyle = `rgba(255, ${Math.round(255 - displayPower * 1.1)}, 50, 0.8)`;
       ctx.lineWidth = 3;
       ctx.setLineDash([6, 4]);
       ctx.beginPath();
       ctx.moveTo(this.ball.x, this.ball.y);
       ctx.lineTo(
-        this.ball.x + Math.cos(angle) * power * 0.5,
-        this.ball.y + Math.sin(angle) * power * 0.5
+        this.ball.x + Math.cos(angle) * displayPower * 0.5,
+        this.ball.y + Math.sin(angle) * displayPower * 0.5
       );
       ctx.stroke();
       ctx.setLineDash([]);
@@ -581,7 +664,78 @@ const GolfGame = {
       ctx.fillStyle = '#feca57';
       ctx.font = '12px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText(`${Math.round(power)}%`, this.ball.x, this.ball.y - 20);
+      ctx.fillText(`${Math.round(displayPower)}%`, this.ball.x, this.ball.y - 20);
+    }
+
+    // Club indicator (top-right badge)
+    var selClub = this.clubs[this.selectedClub];
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.roundRect(canvas.width - 90, 4, 86, 20, 4);
+    ctx.fill();
+    ctx.fillStyle = selClub.color;
+    ctx.font = 'bold 10px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(selClub.icon + ' ' + selClub.name, canvas.width - 8, 18);
+
+    // Club tab (left edge)
+    if (!this.clubPanelOpen) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.beginPath();
+      ctx.roundRect(0, 160, 24, 60, [0, 6, 6, 0]);
+      ctx.fill();
+      ctx.fillStyle = selClub.color;
+      ctx.fillRect(0, 160, 3, 60);
+      ctx.font = '14px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(selClub.icon, 12, 186);
+      ctx.fillStyle = '#aaa';
+      ctx.font = '10px system-ui';
+      ctx.fillText('\u{25B6}', 12, 210);
+    }
+
+    // Club panel (when open)
+    if (this.clubPanelOpen) {
+      var panelH = 20 + this.clubs.length * 38;
+      ctx.fillStyle = 'rgba(0,0,0,0.85)';
+      ctx.beginPath();
+      ctx.roundRect(0, 80, 120, panelH, [0, 8, 8, 0]);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(0, 80, 120, panelH, [0, 8, 8, 0]);
+      ctx.stroke();
+      ctx.fillStyle = '#aaa';
+      ctx.font = 'bold 10px system-ui';
+      ctx.textAlign = 'left';
+      ctx.fillText('SELECT CLUB', 8, 97);
+      for (var ci = 0; ci < this.clubs.length; ci++) {
+        var cl = this.clubs[ci];
+        var rowY = 100 + ci * 38;
+        var isSelected = (ci === this.selectedClub);
+        if (isSelected) {
+          ctx.fillStyle = 'rgba(255,255,255,0.1)';
+          ctx.fillRect(0, rowY, 120, 38);
+          ctx.fillStyle = cl.color;
+          ctx.fillRect(0, rowY, 3, 38);
+        }
+        ctx.font = '14px system-ui';
+        ctx.textAlign = 'left';
+        ctx.fillText(cl.icon, 8, rowY + 18);
+        ctx.fillStyle = isSelected ? '#fff' : '#bbb';
+        ctx.font = 'bold 11px system-ui';
+        ctx.fillText(cl.name, 28, rowY + 17);
+        ctx.fillStyle = '#333';
+        ctx.fillRect(28, rowY + 24, 60, 4);
+        ctx.fillStyle = cl.color;
+        ctx.fillRect(28, rowY + 24, 60 * (cl.power / 1.5), 4);
+        ctx.fillStyle = '#888';
+        ctx.font = '8px system-ui';
+        ctx.textAlign = 'right';
+        if (cl.accuracy === 0) ctx.fillText('Perfect', 115, rowY + 29);
+        else ctx.fillText('\u{00B1}' + (cl.accuracy * 180 / Math.PI).toFixed(1) + '\u{00B0}', 115, rowY + 29);
+      }
     }
 
     // Message
@@ -598,5 +752,6 @@ const GolfGame = {
     this.canvas.removeEventListener('mousedown', this._onMouseDown);
     this.canvas.removeEventListener('mousemove', this._onMouseMove);
     this.canvas.removeEventListener('mouseup', this._onMouseUp);
+    window.removeEventListener('keydown', this._onKeyDown);
   },
 };

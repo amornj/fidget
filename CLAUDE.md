@@ -35,5 +35,5 @@ Games manage their own state, rendering, and input. Canvas is shared — each ga
 3. Add a `<button class="game-card" data-game="yourgame">` to the menu grid in `popup.html`
 4. Register in `js/popup.js`: add entry to `games` object
 
-## Current Games (11)
-Snake, Slime Volley, Mini Golf, Baseball, Clicker, Breakout, Flappy, Pong, Reaction, Powergolf, Barista
+## Current Games (18)
+Snake, Slime Volley, Mini Golf, Baseball, Clicker, Breakout, Flappy, Pong, Reaction, Powergolf, Barista, Bartender, Minesweeper, UNO, Connect Four, Tic Tac Toe, Blackjack, Poker

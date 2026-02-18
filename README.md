@@ -1,6 +1,6 @@
 # 🎮 Fidget!
 
-A Chrome extension packed with 9 mini-games — perfect for quick breaks.
+A Chrome extension packed with 11 mini-games — perfect for quick breaks.
 
 ## Games
 
@@ -15,6 +15,8 @@ A Chrome extension packed with 9 mini-games — perfect for quick breaks.
 | 🐤 **Flappy** | Click / SPACE | Dodge pipes, beat your high score |
 | 🏓 **Pong** | Mouse | Classic pong vs AI with rally tracking |
 | ⚡ **Reaction** | Click / SPACE | Reaction time tester with stats |
+| 🔥 **Powergolf** | Click & drag, 1-3 / right-click | 15-hole golf with 13 powerup abilities |
+| ☕ **Barista** | Mouse | Pour, mix & serve drinks across 8 rounds |
 
 ## Install
 
@@ -33,6 +35,7 @@ fidget/
 ├── icons/
 └── js/
     ├── popup.js
+    ├── sfx.js
     └── games/
         ├── snake.js
         ├── slime.js
@@ -42,7 +45,9 @@ fidget/
         ├── breakout.js
         ├── flappy.js
         ├── pong.js
-        └── reaction.js
+        ├── reaction.js
+        ├── powergolf.js
+        └── barista.js
 ```
 
 ## License

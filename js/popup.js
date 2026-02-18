@@ -10,6 +10,13 @@ const games = {
   reaction: ReactionGame,
   powergolf: PowerGolfGame,
   barista: BaristaGame,
+  bartender: BartenderGame,
+  minesweeper: MinesweeperGame,
+  uno: UnoGame,
+  connectfour: ConnectFourGame,
+  tictactoe: TicTacToeGame,
+  blackjack: BlackjackGame,
+  poker: PokerGame,
 };
 
 let currentGame = null;
